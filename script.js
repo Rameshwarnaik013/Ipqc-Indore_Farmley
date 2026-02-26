@@ -346,10 +346,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getOxygenStatus(productName, value) {
-        const range = productRanges[productName];
-        if (!range) return 'neutral';
         const val = parseFloat(value);
         if (isNaN(val)) return 'neutral';
+
+        const range = productRanges[productName];
+        if (!range) return 'compliant'; // If no range, we count it as compliant/valid check for the denominator
+
         return (val >= range[0] && val <= range[1]) ? 'compliant' : 'non-compliant';
     }
 
@@ -396,7 +398,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const material = calcMaterial();
         const size = calcComp('Size Uniformity (Slice of Mixes)', 'Yes');
 
-        const oxygenChecked = data.filter(r => productRanges[r['Product Name']] && String(r['Oxygen % Check']).toLowerCase() !== 'n/a');
+        const oxygenChecked = data.filter(r => {
+            const val = parseFloat(r['Oxygen % Check']);
+            return !isNaN(val);
+        });
         const compliantOxygen = oxygenChecked.filter(r => getOxygenStatus(r['Product Name'], r['Oxygen % Check']) === 'compliant').length;
         const oxygenPercent = oxygenChecked.length > 0 ? ((compliantOxygen / oxygenChecked.length) * 100).toFixed(1) : 'N/A';
 
