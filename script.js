@@ -305,10 +305,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function processAndRender(data) {
+    async function processAndRender(data) {
+        showSkeleton();
+        // Intentional delay for perceived performance/skeleton visibility
+        await new Promise(resolve => setTimeout(resolve, 400));
         renderTable(data, dashboardTableBody);
         renderCharts(data);
         updateStats(data);
+    }
+
+    function showSkeleton() {
+        // Skeleton for Stats
+        const statValues = ['totalRecords', 'lumpsCompliance', 'leakageCompliance', 'sealCompliance', 'materialCompliance', 'sizeCompliance', 'oxygenCompliance'];
+        const statDescs = ['lumpsCount', 'leakageCount', 'sealCount', 'materialCount', 'sizeCount', 'oxygenCount'];
+
+        statValues.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<div class="skeleton skeleton-value"></div>';
+        });
+
+        statDescs.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<div class="skeleton skeleton-text" style="width: 100px;"></div>';
+        });
+
+        // Skeleton for Table
+        if (dashboardTableBody) {
+            dashboardTableBody.innerHTML = '';
+            for (let i = 0; i < 5; i++) {
+                const tr = document.createElement('tr');
+                tr.className = 'table-skeleton-row';
+                tr.innerHTML = `
+                    <td colspan="11">
+                        <div class="skeleton skeleton-cell"></div>
+                    </td>
+                `;
+                dashboardTableBody.appendChild(tr);
+            }
+        }
     }
 
     function getOxygenStatus(productName, value) {
