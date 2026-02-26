@@ -346,7 +346,7 @@ td {
 /* Precise Column Width Allocation */
 tr th:nth-child(1),
 tr td:nth-child(1) {
-    width: 75px;
+    width: 95px;
 }
 
 /* Date */
