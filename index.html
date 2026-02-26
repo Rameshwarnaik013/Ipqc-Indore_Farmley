@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Farmley IPQC Dashboard - Indore Plant</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-text">Farmley</span>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-item active" data-tab="dashboard">Dashboard</div>
+            </nav>
+            <div class="filters">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="productFilter">Product Name</label>
+                    <select id="productFilter">
+                        <option value="all">All Products</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="datePreset">Date Range</label>
+                    <select id="datePreset">
+                        <option value="custom">Custom Range</option>
+                        <option value="today" selected>Today</option>
+                        <option value="yesterday">Yesterday</option>
+                        <option value="last7days">Last 7 Days</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="startDate">Start Date</label>
+                    <input type="date" id="startDate">
+                </div>
+                <div class="filter-group">
+                    <label for="endDate">End Date</label>
+                    <input type="date" id="endDate">
+                </div>
+                <div class="filter-group">
+                    <label for="statusFilter">Compliance Status</label>
+                    <select id="statusFilter">
+                        <option value="all">All Records</option>
+                        <option value="pass">Pass Only</option>
+                        <option value="fail">Fail Only</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="shiftFilter">Shift</label>
+                    <select id="shiftFilter">
+                        <option value="all">All Shifts</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="checkedByFilter">Checked By</label>
+                    <select id="checkedByFilter">
+                        <option value="all">All Staff</option>
+                    </select>
+                </div>
+                <button id="applyFilters" class="btn btn-primary">Apply Filters</button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>IPQC Quality Monitoring <span class="badge">Indore Plant</span></h1>
+                <div class="header-actions">
+                    <div id="lastUpdated" class="text-secondary small">Last updated: --</div>
+                    <button id="syncData" class="btn btn-outline">Sync with GSheet</button>
+                </div>
+            </header>
+
+            <!-- Dashboard View -->
+            <div id="dashboardView" class="tab-content active">
+                <!-- Stats Overview -->
+                <section class="stats-overview">
+                    <div class="stat-card">
+                        <div class="stat-title">Total Records</div>
+                        <div class="stat-value" id="totalRecords">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Lumps Compliance</div>
+                        <div class="stat-value" id="lumpsCompliance">0%</div>
+                        <div class="stat-desc" id="lumpsCount">0 / 0 compliant</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Leakage Compliance</div>
+                        <div class="stat-value" id="leakageCompliance">0%</div>
+                        <div class="stat-desc" id="leakageCount">0 / 0 compliant</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Pack & Seal Integrity</div>
+                        <div class="stat-value" id="sealCompliance">0%</div>
+                        <div class="stat-desc" id="sealCount">0 / 0 compliant</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Material Uniformity</div>
+                        <div class="stat-value" id="materialCompliance">0%</div>
+                        <div class="stat-desc" id="materialCount">0 / 0 compliant</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Size Uniformity</div>
+                        <div class="stat-value" id="sizeCompliance">0%</div>
+                        <div class="stat-desc" id="sizeCount">0 / 0 compliant</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-title">Oxygen % Compliance</div>
+                        <div class="stat-value" id="oxygenCompliance">0%</div>
+                        <div class="stat-desc" id="oxygenCount">0 / 0 compliant</div>
+                    </div>
+                </section>
+
+                <!-- Charts Section -->
+                <section class="charts-section">
+                    <div class="chart-container full-width">
+                        <h3>Compliance Breakdown (Pass vs Fail)</h3>
+                        <canvas id="complianceChart"></canvas>
+                    </div>
+                </section>
+
+                <!-- Dashboard Table Section -->
+                <section class="table-section" style="margin-top: 2rem;">
+                    <div class="table-header">
+                        <h3>Recent Quality Checks</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Product Name</th>
+                                    <th>Lumps</th>
+                                    <th>Leakage</th>
+                                    <th>Pack & Seal</th>
+                                    <th>Material Uniformity (Mixing)</th>
+                                    <th>Size Uniformity (Slice of Mixes)</th>
+                                    <th>Nitrogen</th>
+                                    <th>Oxygen %</th>
+                                    <th>Shift</th>
+                                    <th>Checked By</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dashboardTableBody">
+                                <tr>
+                                    <td colspan="11" class="loading">Loading dashboard data...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+        </main>
+    </div>
+    <script src="script.js"></script>
+</body>
+
+</html>

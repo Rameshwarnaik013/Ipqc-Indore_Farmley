@@ -1,0 +1,11 @@
+{
+    "version": 2,
+    "name": "ipqc-indore-dashboard",
+    "cleanUrls": true,
+    "rewrites": [
+        {
+            "source": "/(.*)",
+            "destination": "/$1"
+        }
+    ]
+}
