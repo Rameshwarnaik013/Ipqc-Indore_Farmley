@@ -353,7 +353,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const range = productRanges[productName];
         if (!range) return 'compliant'; // If no range, we count it as compliant/valid check for the denominator
 
-        return (val >= range[0] && val <= range[1]) ? 'compliant' : 'non-compliant';
+        return (val <= range[1]) ? 'compliant' : 'non-compliant';
     }
 
 
