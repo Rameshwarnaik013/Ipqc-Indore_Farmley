@@ -563,3 +563,35 @@ tr td:nth-child(11) {
     width: 100%;
     border-radius: 0.25rem;
 }
+
+/* Refresh Button Rotation */
+@keyframes rotate {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.rotating {
+    animation: rotate 1s linear infinite;
+}
+
+#refreshData {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#refreshData:hover {
+    background-color: #f1f5f9;
+}
+
+#refreshData svg {
+    color: var(--primary);
+}

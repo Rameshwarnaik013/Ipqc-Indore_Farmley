@@ -195,6 +195,9 @@ document.addEventListener('DOMContentLoaded', () => {
         { "Date": "2026-02-04", "Product Name": "Smokey Almond Farmley 50g", "Lumps": "Yes", "Leakage Test": "No", "Pack & Seal Integrity": "No", "Material Uniformity (Mixing)": "No", "Size Uniformity (Slice of Mixes)": "No", "Nitrogen Flush": "No", "Oxygen % Check": "4.5", "Shift": "Night", "Checked By": "John" }
     ];
 
+    const refreshBtn = document.getElementById('refreshData');
+    const refreshIcon = document.getElementById('refreshIcon');
+
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
 
@@ -202,7 +205,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function init() {
         // Set default dates to Today
-        const todayStr = new Date().toISOString().split('T')[0];
+        const now = new Date();
+        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
         if (startDateInput) startDateInput.value = todayStr;
         if (endDateInput) endDateInput.value = todayStr;
 
@@ -241,6 +245,12 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
 
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => {
+                fetchData();
+            });
+        }
+
 
         if (datePreset) {
             datePreset.addEventListener('change', () => {
@@ -260,8 +270,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     start.setDate(now.getDate() - 6);
                 }
 
-                startDateInput.value = start.toISOString().split('T')[0];
-                endDateInput.value = end.toISOString().split('T')[0];
+                startDateInput.value = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0');
+                endDateInput.value = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
 
                 // Auto apply
                 filteredData = filterData(allData);
@@ -280,6 +290,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchData() {
         try {
+            if (refreshIcon) refreshIcon.classList.add('rotating');
             renderTable([], dashboardTableBody, true); // Loading state
 
             const response = await fetch(`${APPS_SCRIPT_URL}?t=${Date.now()}`);
@@ -296,13 +307,22 @@ document.addEventListener('DOMContentLoaded', () => {
             allData = normalizeData(data);
             populateStaffFilter(allData);
             populateShiftFilter(allData);
-            filteredData = [...allData];
-            processAndRender(allData);
+
+            // Re-apply current filters to freshly fetched data
+            filteredData = filterData(allData);
+            processAndRender(filteredData);
+
             lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
         } catch (error) {
             console.error('Error fetching data:', error);
             allData = normalizeData(mockData);
-            processAndRender(allData);
+            filteredData = filterData(allData);
+            processAndRender(filteredData);
+        } finally {
+            if (refreshIcon) {
+                // Ensure rotation lasts at least a bit even if fetch is instant
+                setTimeout(() => refreshIcon.classList.remove('rotating'), 500);
+            }
         }
     }
 
@@ -553,26 +573,43 @@ document.addEventListener('DOMContentLoaded', () => {
         const startVal = startDateInput.value;
         const endVal = endDateInput.value;
 
-        const startDate = startVal ? new Date(startVal) : null;
-        const endDate = endVal ? new Date(endVal) : null;
+        // Parse filter dates or null
+        // Standardize to local midnight for comparison
+        let startDate = null;
+        if (startVal) {
+            const [y, m, d] = startVal.split('-').map(Number);
+            startDate = new Date(y, m - 1, d);
+        }
 
-        if (startDate) startDate.setHours(0, 0, 0, 0);
-        if (endDate) endDate.setHours(23, 59, 59, 999);
+        let endDate = null;
+        if (endVal) {
+            const [y, m, d] = endVal.split('-').map(Number);
+            endDate = new Date(y, m - 1, d);
+        }
 
         return data.filter(row => {
             const productMatch = product === 'all' || row['Product Name'] === product;
 
+            // Date standardisation
             const rowDateRaw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'];
-            const rowDate = rowDateRaw ? new Date(rowDateRaw) : null;
-
             let dateMatch = true;
-            if (rowDate && !isNaN(rowDate.getTime())) {
-                rowDate.setHours(0, 0, 0, 0);
-                if (startDate && rowDate < startDate) dateMatch = false;
-                if (endDate && rowDate > endDate) dateMatch = false;
-            } else {
-                // If no valid date found, only show if no date filter is active or if we can't determine
-                if (startDate || endDate) dateMatch = false;
+
+            if (rowDateRaw) {
+                // Try parsing the date. Google Sheets often returns timestamps that can be parsed.
+                const rowDateObj = new Date(rowDateRaw);
+                if (!isNaN(rowDateObj.getTime())) {
+                    // Standardise to local midnight for day-level comparison
+                    const rowMidnight = new Date(rowDateObj.getFullYear(), rowDateObj.getMonth(), rowDateObj.getDate());
+
+                    if (startDate && rowMidnight < startDate) dateMatch = false;
+                    if (endDate && rowMidnight > endDate) dateMatch = false;
+                } else if (startDate || endDate) {
+                    // Invalid date but filter is active
+                    dateMatch = false;
+                }
+            } else if (startDate || endDate) {
+                // No date found but filter is active
+                dateMatch = false;
             }
 
             // Nitrogen Flush filter
