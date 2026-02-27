@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkedByFilter = document.getElementById('checkedByFilter');
 
     let allData = [];
+    let filteredData = [];
     let complianceChart;
 
     // --- Configuration ---
@@ -581,7 +582,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusMatch = (status === 'fail') ? hasFailure : !hasFailure;
             }
 
-            const shiftMatch = shift === 'all' || String(row['Shift'] || '').toLowerCase() === shift.toLowerCase();
+            // Robust Shift Match
+            const rowShift = String(row['Shift'] || '').trim().toLowerCase();
+            const filterShift = shift.trim().toLowerCase();
+            const shiftMatch = filterShift === 'all' || rowShift === filterShift;
+
             const staffMatch = checkedBy === 'all' || row['Checked By'] === checkedBy;
 
             return productMatch && dateMatch && statusMatch && shiftMatch && staffMatch;
