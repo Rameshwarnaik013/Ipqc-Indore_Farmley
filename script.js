@@ -674,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="${String(row['Pack & Seal Integrity'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Pack & Seal Integrity'] || 'N/A'}</td>
                 <td class="${String(row['Material Uniformity (Mixing)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Material Uniformity (Mixing)'] || 'N/A'}</td>
                 <td class="${String(row['Size Uniformity (Slice of Mixes)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Size Uniformity (Slice of Mixes)'] || 'N/A'}</td>
-                <td>${row['Nitrogen % Check'] || 'N/A'}</td>
+                <td>${row['Nitrogen Flush'] || 'N/A'}</td>
                 <td class="${oxygenStatus === 'breach' || oxygenStatus === 'non-compliant' ? 'breach-highlight' : ''}">${row['Oxygen % Check'] || 'N/A'}${oxyStatus !== 'neutral' ? '%' : ''}</td>
                 <td>${row['Shift'] || 'N/A'}</td>
                 <td title="${row['Checked By']}">${row['Checked By'] || 'N/A'}</td>
