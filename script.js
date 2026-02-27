@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const navItems = document.querySelectorAll('.nav-item');
     const tabContents = document.querySelectorAll('.tab-content');
     const dashboardTableBody = document.getElementById('dashboardTableBody');
-    const statusFilter = document.getElementById('statusFilter');
+    const nitrogenFilter = document.getElementById('nitrogenFilter');
     const datePreset = document.getElementById('datePreset');
     const shiftFilter = document.getElementById('shiftFilter');
     const checkedByFilter = document.getElementById('checkedByFilter');
@@ -226,7 +226,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Auto-apply for all filters
-        [productFilter, statusFilter, shiftFilter, checkedByFilter].forEach(filter => {
+        [productFilter, nitrogenFilter, shiftFilter, checkedByFilter].forEach(filter => {
             if (filter) {
                 filter.addEventListener('change', () => {
                     filteredData = filterData(allData);
@@ -547,7 +547,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function filterData(data) {
         const product = productFilter.value;
-        const status = statusFilter.value;
+        const nitrogen = nitrogenFilter ? nitrogenFilter.value : 'all';
         const shift = shiftFilter ? shiftFilter.value : 'all';
         const checkedBy = checkedByFilter ? checkedByFilter.value : 'all';
         const startVal = startDateInput.value;
@@ -575,11 +575,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (startDate || endDate) dateMatch = false;
             }
 
-            // Compliance status filter
-            let statusMatch = true;
-            if (status !== 'all') {
-                const hasFailure = checkRowFailure(row);
-                statusMatch = (status === 'fail') ? hasFailure : !hasFailure;
+            // Nitrogen Flush filter
+            let nitrogenMatch = true;
+            if (nitrogen !== 'all') {
+                const rowNitrogen = String(row['Nitrogen Flush'] || '').trim().toLowerCase();
+                nitrogenMatch = rowNitrogen === nitrogen.toLowerCase();
             }
 
             // Robust Shift Match
@@ -589,7 +589,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const staffMatch = checkedBy === 'all' || row['Checked By'] === checkedBy;
 
-            return productMatch && dateMatch && statusMatch && shiftMatch && staffMatch;
+            return productMatch && dateMatch && nitrogenMatch && shiftMatch && staffMatch;
         });
     }
 
