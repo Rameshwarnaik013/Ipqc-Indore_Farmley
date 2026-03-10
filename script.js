@@ -281,8 +281,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         [startDateInput, endDateInput].forEach(inp => {
             if (inp) {
-                inp.addEventListener('input', () => {
+                inp.addEventListener('change', () => {
                     if (datePreset) datePreset.value = 'custom';
+                    filteredData = filterData(allData);
+                    processAndRender(filteredData);
                 });
             }
         });
@@ -596,7 +598,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (rowDateRaw) {
                 // Try parsing the date. Google Sheets often returns timestamps that can be parsed.
-                const rowDateObj = new Date(rowDateRaw);
+                let rowDateObj = new Date(rowDateRaw);
+
+                // Fix for DD/MM/YYYY parsing, which JS engine might misconstrue as MM/DD/YYYY
+                if (typeof rowDateRaw === 'string') {
+                    const INformat = rowDateRaw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                    if (INformat) {
+                        rowDateObj = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
+                    }
+                }
+
                 if (!isNaN(rowDateObj.getTime())) {
                     // Standardise to local midnight for day-level comparison
                     const rowMidnight = new Date(rowDateObj.getFullYear(), rowDateObj.getMonth(), rowDateObj.getDate());
@@ -740,7 +751,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatDate(dateStr) {
         if (!dateStr) return 'N/A';
-        const date = new Date(dateStr);
+        let date = new Date(dateStr);
+
+        if (typeof dateStr === 'string') {
+            const INformat = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (INformat) {
+                date = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
+            }
+        }
+
         if (isNaN(date.getTime())) return dateStr;
 
         // Return DD/MM/YYYY or similar human readable format
