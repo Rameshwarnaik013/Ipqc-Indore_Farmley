@@ -204,11 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     async function init() {
-        // Set default dates to Today
+        // Set default dates to Yesterday
         const now = new Date();
-        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
-        if (startDateInput) startDateInput.value = todayStr;
-        if (endDateInput) endDateInput.value = todayStr;
+        const yesterday = new Date(now);
+        yesterday.setDate(now.getDate() - 1);
+        const yStr = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
+        if (startDateInput) startDateInput.value = yStr;
+        if (endDateInput) endDateInput.value = yStr;
 
         await fetchData();
         populateProductFilter(allData);
@@ -293,7 +295,28 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchData() {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
-            renderTable([], dashboardTableBody, true); // Loading state
+
+            // Try to load cached data for speed (stale-while-revalidate pattern)
+            const cachedBody = localStorage.getItem('farmley_ipqc_data');
+            if (cachedBody && allData.length === 0) {
+                try {
+                    const parsed = JSON.parse(cachedBody);
+                    if (parsed && parsed.length > 0) {
+                        allData = normalizeData(parsed);
+                        populateStaffFilter(allData);
+                        populateShiftFilter(allData);
+                        filteredData = filterData(allData);
+                        processAndRender(filteredData);
+                    }
+                } catch (e) {
+                    console.error('Cache parsing error:', e);
+                }
+            }
+
+            if (allData.length === 0) {
+                renderTable([], dashboardTableBody, true); // Loading state
+                showSkeleton();
+            }
 
             const response = await fetch(`${APPS_SCRIPT_URL}?t=${Date.now()}`);
             const data = await response.json();
@@ -302,9 +325,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (data.error) {
                 console.error('Server error:', data.error);
-                dashboardTableBody.innerHTML = `<tr><td colspan="11" class="loading" style="color:red">Server Error: ${data.error}</td></tr>`;
+                if (allData.length === 0) {
+                    dashboardTableBody.innerHTML = `<tr><td colspan="11" class="loading" style="color:red">Server Error: ${data.error}</td></tr>`;
+                }
                 return;
             }
+
+            localStorage.setItem('farmley_ipqc_data', JSON.stringify(data));
 
             allData = normalizeData(data);
             populateStaffFilter(allData);
@@ -328,10 +355,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function processAndRender(data) {
-        showSkeleton();
-        // Intentional delay for perceived performance/skeleton visibility
-        await new Promise(resolve => setTimeout(resolve, 400));
+    function processAndRender(data) {
         renderTable(data, dashboardTableBody);
         renderCharts(data);
         updateStats(data);
