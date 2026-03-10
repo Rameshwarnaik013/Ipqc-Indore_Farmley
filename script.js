@@ -593,7 +593,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const productMatch = product === 'all' || row['Product Name'] === product;
 
             // Date standardisation
-            const rowDateRaw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'];
+            const rowDateRaw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
             let dateMatch = true;
 
             if (rowDateRaw) {
@@ -716,7 +716,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (checkRowFailure(row)) tr.classList.add('row-failure');
 
-            const dateVal = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'];
+            const dateVal = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
             const oxygenStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
 
             tr.innerHTML = `
