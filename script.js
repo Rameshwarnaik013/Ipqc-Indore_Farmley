@@ -292,6 +292,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Pre-parse a date from a raw value and cache it on the row object
+    function parseRowDate(row) {
+        if (row._parsedDate !== undefined) return; // already parsed
+        const raw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
+        if (!raw) { row._parsedDate = null; return; }
+
+        if (typeof raw === 'string') {
+            const INformat = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+            if (INformat) {
+                row._parsedDate = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
+                return;
+            }
+        }
+        const d = new Date(raw);
+        if (!isNaN(d.getTime())) {
+            // Normalise to midnight
+            row._parsedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        } else {
+            row._parsedDate = null;
+        }
+    }
+
     async function fetchData() {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
@@ -303,10 +325,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const parsed = JSON.parse(cachedBody);
                     if (parsed && parsed.length > 0) {
                         allData = normalizeData(parsed);
+                        allData.forEach(parseRowDate); // pre-parse all dates once
                         populateStaffFilter(allData);
                         populateShiftFilter(allData);
                         filteredData = filterData(allData);
-                        processAndRender(filteredData);
+                        requestAnimationFrame(() => processAndRender(filteredData));
                     }
                 } catch (e) {
                     console.error('Cache parsing error:', e);
@@ -334,19 +357,22 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('farmley_ipqc_data', JSON.stringify(data));
 
             allData = normalizeData(data);
+            allData.forEach(parseRowDate); // pre-parse all dates once on fresh data
             populateStaffFilter(allData);
             populateShiftFilter(allData);
 
             // Re-apply current filters to freshly fetched data
             filteredData = filterData(allData);
-            processAndRender(filteredData);
-
-            lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            requestAnimationFrame(() => {
+                processAndRender(filteredData);
+                lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            });
         } catch (error) {
             console.error('Error fetching data:', error);
             allData = normalizeData(mockData);
+            allData.forEach(parseRowDate);
             filteredData = filterData(allData);
-            processAndRender(filteredData);
+            requestAnimationFrame(() => processAndRender(filteredData));
         } finally {
             if (refreshIcon) {
                 // Ensure rotation lasts at least a bit even if fetch is instant
@@ -599,69 +625,49 @@ document.addEventListener('DOMContentLoaded', () => {
         const startVal = startDateInput.value;
         const endVal = endDateInput.value;
 
-        // Parse filter dates or null
-        // Standardize to local midnight for comparison
+        // Parse filter boundary dates once (not per row)
         let startDate = null;
         if (startVal) {
             const [y, m, d] = startVal.split('-').map(Number);
             startDate = new Date(y, m - 1, d);
         }
-
         let endDate = null;
         if (endVal) {
             const [y, m, d] = endVal.split('-').map(Number);
             endDate = new Date(y, m - 1, d);
         }
 
+        const filterShiftLow = shift.trim().toLowerCase();
+        const nitrogenLow = nitrogen.toLowerCase();
+
         return data.filter(row => {
-            const productMatch = product === 'all' || row['Product Name'] === product;
+            // Product filter
+            if (product !== 'all' && row['Product Name'] !== product) return false;
 
-            // Date standardisation
-            const rowDateRaw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
-            let dateMatch = true;
-
-            if (rowDateRaw) {
-                // Try parsing the date. Google Sheets often returns timestamps that can be parsed.
-                let rowDateObj = new Date(rowDateRaw);
-
-                // Fix for DD/MM/YYYY parsing, which JS engine might misconstrue as MM/DD/YYYY
-                if (typeof rowDateRaw === 'string') {
-                    const INformat = rowDateRaw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-                    if (INformat) {
-                        rowDateObj = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
-                    }
-                }
-
-                if (!isNaN(rowDateObj.getTime())) {
-                    // Standardise to local midnight for day-level comparison
-                    const rowMidnight = new Date(rowDateObj.getFullYear(), rowDateObj.getMonth(), rowDateObj.getDate());
-
-                    if (startDate && rowMidnight < startDate) dateMatch = false;
-                    if (endDate && rowMidnight > endDate) dateMatch = false;
-                } else if (startDate || endDate) {
-                    // Invalid date but filter is active
-                    dateMatch = false;
-                }
-            } else if (startDate || endDate) {
-                // No date found but filter is active
-                dateMatch = false;
+            // Date filter — use pre-parsed _parsedDate (set by parseRowDate)
+            if (startDate || endDate) {
+                const rd = row._parsedDate;
+                if (!rd) return false;
+                if (startDate && rd < startDate) return false;
+                if (endDate && rd > endDate) return false;
             }
 
             // Nitrogen Flush filter
-            let nitrogenMatch = true;
             if (nitrogen !== 'all') {
                 const rowNitrogen = String(row['Nitrogen Flush'] || '').trim().toLowerCase();
-                nitrogenMatch = rowNitrogen === nitrogen.toLowerCase();
+                if (rowNitrogen !== nitrogenLow) return false;
             }
 
-            // Robust Shift Match
-            const rowShift = String(row['Shift'] || '').trim().toLowerCase();
-            const filterShift = shift.trim().toLowerCase();
-            const shiftMatch = filterShift === 'all' || rowShift === filterShift;
+            // Shift filter
+            if (filterShiftLow !== 'all') {
+                const rowShift = String(row['Shift'] || '').trim().toLowerCase();
+                if (rowShift !== filterShiftLow) return false;
+            }
 
-            const staffMatch = checkedBy === 'all' || row['Checked By'] === checkedBy;
+            // Staff filter
+            if (checkedBy !== 'all' && row['Checked By'] !== checkedBy) return false;
 
-            return productMatch && dateMatch && nitrogenMatch && shiftMatch && staffMatch;
+            return true;
         });
     }
 
@@ -669,13 +675,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!checkedByFilter) return;
         const staff = [...new Set(data.map(item => item['Checked By']).filter(Boolean))].sort();
         const currentVal = checkedByFilter.value;
-        checkedByFilter.innerHTML = '<option value="all">All Staff</option>';
+        // Build with DocumentFragment for a single DOM write
+        const frag = document.createDocumentFragment();
+        const allOpt = document.createElement('option');
+        allOpt.value = 'all'; allOpt.textContent = 'All Staff';
+        frag.appendChild(allOpt);
         staff.forEach(name => {
             const option = document.createElement('option');
             option.value = name;
             option.textContent = name;
-            checkedByFilter.appendChild(option);
+            frag.appendChild(option);
         });
+        checkedByFilter.innerHTML = '';
+        checkedByFilter.appendChild(frag);
         if (staff.includes(currentVal)) checkedByFilter.value = currentVal;
     }
 
@@ -683,13 +695,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!shiftFilter) return;
         const shifts = [...new Set(data.map(item => item['Shift']).filter(Boolean))].sort();
         const currentVal = shiftFilter.value;
-        shiftFilter.innerHTML = '<option value="all">All Shifts</option>';
+        // Build with DocumentFragment for a single DOM write
+        const frag = document.createDocumentFragment();
+        const allOpt = document.createElement('option');
+        allOpt.value = 'all'; allOpt.textContent = 'All Shifts';
+        frag.appendChild(allOpt);
         shifts.forEach(s => {
             const option = document.createElement('option');
             option.value = s;
             option.textContent = s;
-            shiftFilter.appendChild(option);
+            frag.appendChild(option);
         });
+        shiftFilter.innerHTML = '';
+        shiftFilter.appendChild(frag);
         if (shifts.includes(currentVal)) shiftFilter.value = currentVal;
     }
 
@@ -711,7 +729,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable(data, targetBody, isLoading = false) {
         if (!targetBody) return;
-        targetBody.innerHTML = '';
 
         if (isLoading) {
             targetBody.innerHTML = `<tr><td colspan="11" class="loading">Loading data...</td></tr>`;
@@ -723,27 +740,13 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        data.forEach(row => {
-            const tr = document.createElement('tr');
-
-            const lumpsS = String(row['Lumps'] || '').toLowerCase() === 'yes' ? 'status-yes' : 'status-no';
-            const leakageS = String(row['Leakage Test'] || '').toLowerCase() === 'no' ? 'status-yes' : 'status-no';
-            const sealS = String(row['Pack & Seal Integrity'] || '').toLowerCase() === 'no' ? 'status-yes' : 'status-no';
-            const materialS = String(row['Material Uniformity (Mixing)'] || '').toLowerCase() === 'no' ? 'status-yes' : 'status-no';
-            const sizeS = String(row['Size Uniformity (Slice of Mixes)'] || '').toLowerCase() === 'no' ? 'status-yes' : 'status-no';
-
+        // Build entire table HTML as a single string — eliminates per-row DOM reflows
+        const rows = data.map(row => {
             const oxyStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
-            const oxyClass = oxyStatus === 'non-compliant' ? 'breach-cell' : (oxyStatus === 'compliant' ? 'status-no' : '');
-
-            const isGasProd = productRanges[row['Product Name']];
-            const nWarning = (isGasProd && String(row['Nitrogen Flush'] || '').toLowerCase() === 'no') ? 'status-yes' : '';
-
-            if (checkRowFailure(row)) tr.classList.add('row-failure');
-
             const dateVal = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
-            const oxygenStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
+            const failClass = checkRowFailure(row) ? ' class="row-failure"' : '';
 
-            tr.innerHTML = `
+            return `<tr${failClass}>
                 <td>${formatDate(dateVal)}</td>
                 <td title="${row['Product Name']}">${row['Product Name']}</td>
                 <td class="${String(row['Lumps'] || '').toLowerCase() === 'yes' ? 'breach-highlight' : ''}">${row['Lumps'] || 'N/A'}</td>
@@ -752,25 +755,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="${String(row['Material Uniformity (Mixing)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Material Uniformity (Mixing)'] || 'N/A'}</td>
                 <td class="${String(row['Size Uniformity (Slice of Mixes)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Size Uniformity (Slice of Mixes)'] || 'N/A'}</td>
                 <td>${row['Nitrogen Flush'] || 'N/A'}</td>
-                <td class="${oxygenStatus === 'breach' || oxygenStatus === 'non-compliant' ? 'breach-highlight' : ''}">${row['Oxygen % Check'] || 'N/A'}${oxyStatus !== 'neutral' ? '%' : ''}</td>
+                <td class="${oxyStatus === 'breach' || oxyStatus === 'non-compliant' ? 'breach-highlight' : ''}">${row['Oxygen % Check'] || 'N/A'}${oxyStatus !== 'neutral' ? '%' : ''}</td>
                 <td>${row['Shift'] || 'N/A'}</td>
                 <td title="${row['Checked By']}">${row['Checked By'] || 'N/A'}</td>
-            `;
-            targetBody.appendChild(tr);
+            </tr>`;
         });
+
+        // Single DOM write — much faster than appending row-by-row
+        targetBody.innerHTML = rows.join('');
     }
     function populateProductFilter(data) {
         if (!productFilter) return;
         const currentVal = productFilter.value;
-        productFilter.innerHTML = '<option value="all">All Products</option>';
         const products = [...new Set(data.map(r => r['Product Name']))].sort();
+        // Build with DocumentFragment for a single DOM write
+        const frag = document.createDocumentFragment();
+        const allOpt = document.createElement('option');
+        allOpt.value = 'all'; allOpt.textContent = 'All Products';
+        frag.appendChild(allOpt);
         products.forEach(p => {
             const opt = document.createElement('option');
             opt.value = p;
             opt.textContent = p;
             if (p === currentVal) opt.selected = true;
-            productFilter.appendChild(opt);
+            frag.appendChild(opt);
         });
+        productFilter.innerHTML = '';
+        productFilter.appendChild(frag);
     }
 
     function formatDate(dateStr) {
