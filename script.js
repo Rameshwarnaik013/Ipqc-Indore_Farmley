@@ -421,9 +421,15 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function processAndRender(data) {
-        renderTable(data, dashboardTableBody);
-        renderCharts(data);
-        updateStats(data);
+        // Sort newest date first so today's entries appear at the top immediately
+        const sorted = [...data].sort((a, b) => {
+            const da = a._parsedDate ? a._parsedDate.getTime() : 0;
+            const db = b._parsedDate ? b._parsedDate.getTime() : 0;
+            return db - da; // descending — latest date first
+        });
+        renderTable(sorted, dashboardTableBody);
+        renderCharts(sorted);
+        updateStats(sorted);
     }
 
     function showSkeleton() {
