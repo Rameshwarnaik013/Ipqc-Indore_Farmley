@@ -211,11 +211,32 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endDateInput) endDateInput.value = todayStr;
         if (datePreset) datePreset.value = 'today';
 
-        // Always show skeleton immediately — never show stale cached data on load
+        // Step 1: Show skeleton immediately
         showSkeleton();
         setupEventListeners();
 
-        // Fetch today's fresh data (no await — skeleton stays visible until data arrives)
+        // Step 2: If we have ANY cached data, show it right away so the screen isn't blank
+        // This gives instant feedback while the Apps Script warms up in background
+        const cachedBody = localStorage.getItem('farmley_ipqc_data');
+        if (cachedBody) {
+            try {
+                const parsed = JSON.parse(cachedBody);
+                if (parsed && parsed.length > 0) {
+                    allData = normalizeData(parsed);
+                    allData.forEach(parseRowDate);
+                    populateProductFilter(allData);
+                    populateStaffFilter(allData);
+                    populateShiftFilter(allData);
+                    filteredData = filterData(allData);
+                    requestAnimationFrame(() => {
+                        processAndRender(filteredData);
+                        if (lastUpdatedEl) lastUpdatedEl.textContent = 'Showing cached data — syncing latest...';
+                    });
+                }
+            } catch (e) { /* ignore bad cache */ }
+        }
+
+        // Step 3: Fetch fresh today-only data in background (doesn't block UI)
         fetchData();
     }
 
@@ -223,15 +244,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (applyFiltersBtn) {
             applyFiltersBtn.addEventListener('click', () => {
+                if (allData.length === 0) return; // data not loaded yet
                 filteredData = filterData(allData);
                 processAndRender(filteredData);
             });
         }
 
-        // Auto-apply for all filters
+        // Auto-apply for all filters — guard against empty allData during load
         [productFilter, nitrogenFilter, shiftFilter, checkedByFilter].forEach(filter => {
             if (filter) {
                 filter.addEventListener('change', () => {
+                    if (allData.length === 0) return;
                     filteredData = filterData(allData);
                     processAndRender(filteredData);
                 });
@@ -249,7 +272,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 fetchData();
             });
         }
-
 
         if (datePreset) {
             datePreset.addEventListener('change', () => {
@@ -272,9 +294,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 startDateInput.value = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0');
                 endDateInput.value = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
 
-                // Auto apply
-                filteredData = filterData(allData);
-                processAndRender(filteredData);
+                // When changing date range, trigger a fresh server fetch with the new dates
+                // (only filter locally if we already have data for that range)
+                if (allData.length > 0) {
+                    filteredData = filterData(allData);
+                    processAndRender(filteredData);
+                }
+                fetchData();
             });
         }
 
@@ -282,8 +308,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inp) {
                 inp.addEventListener('change', () => {
                     if (datePreset) datePreset.value = 'custom';
-                    filteredData = filterData(allData);
-                    processAndRender(filteredData);
+                    if (allData.length > 0) {
+                        filteredData = filterData(allData);
+                        processAndRender(filteredData);
+                    }
+                    fetchData();
                 });
             }
         });
@@ -314,12 +343,15 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchData() {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
+            if (lastUpdatedEl && allData.length > 0) {
+                lastUpdatedEl.textContent = 'Syncing latest data...';
+            }
 
             if (allData.length === 0) {
                 showSkeleton();
             }
 
-            // Pass exact date range to server — no buffer needed (server filters to the day)
+            // Pass exact date range to server
             const startVal = startDateInput ? startDateInput.value : '';
             const endVal = endDateInput ? endDateInput.value : '';
 
@@ -327,15 +359,25 @@ document.addEventListener('DOMContentLoaded', () => {
             if (startVal) url += `&startDate=${startVal}`;
             if (endVal)   url += `&endDate=${endVal}`;
 
-            const response = await fetch(url);
-            const data = await response.json();
+            // 25-second timeout — Apps Script can be slow on cold start
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 25000);
 
+            let response;
+            try {
+                response = await fetch(url, { signal: controller.signal });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+
+            const data = await response.json();
             console.log(`Fetched ${data.length} records from GSheet`);
 
             if (data.error) {
                 console.error('Server error:', data.error);
                 if (allData.length === 0) {
-                    dashboardTableBody.innerHTML = `<tr><td colspan="11" class="loading" style="color:red">Server Error: ${data.error}</td></tr>`;
+                    dashboardTableBody.innerHTML = `<tr><td colspan="11" class="loading" style="color:#ef4444">Server Error: ${data.error}</td></tr>`;
+                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Fetch failed — showing cached data';
                 }
                 return;
             }
@@ -351,15 +393,25 @@ document.addEventListener('DOMContentLoaded', () => {
             filteredData = filterData(allData);
             requestAnimationFrame(() => {
                 processAndRender(filteredData);
-                lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+                if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
             });
+
         } catch (error) {
-            console.error('Error fetching data:', error);
+            if (error.name === 'AbortError') {
+                console.warn('Fetch timed out after 25s — Apps Script cold start too slow');
+                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Sync timed out — showing cached data';
+            } else {
+                console.error('Error fetching data:', error);
+            }
+            // If we have no data at all, fall back to mock data so screen isn't blank
             if (allData.length === 0) {
                 allData = normalizeData(mockData);
                 allData.forEach(parseRowDate);
                 filteredData = filterData(allData);
-                requestAnimationFrame(() => processAndRender(filteredData));
+                requestAnimationFrame(() => {
+                    processAndRender(filteredData);
+                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Could not reach server — showing demo data';
+                });
             }
         } finally {
             if (refreshIcon) {
