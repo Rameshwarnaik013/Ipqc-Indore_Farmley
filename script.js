@@ -212,14 +212,30 @@ document.addEventListener('DOMContentLoaded', () => {
         if (startDateInput) startDateInput.value = yStr;
         if (endDateInput) endDateInput.value = yStr;
 
-        await fetchData();
-        populateProductFilter(allData);
-        populateStaffFilter(allData);
+        // --- Instant cache boot-up ---
+        // Show cached data immediately (synchronously) so the UI is usable at once
+        const cachedBody = localStorage.getItem('farmley_ipqc_data');
+        if (cachedBody) {
+            try {
+                const parsed = JSON.parse(cachedBody);
+                if (parsed && parsed.length > 0) {
+                    allData = normalizeData(parsed);
+                    allData.forEach(parseRowDate);
+                    populateProductFilter(allData);
+                    populateStaffFilter(allData);
+                    populateShiftFilter(allData);
+                    filteredData = filterData(allData);
+                    requestAnimationFrame(() => processAndRender(filteredData));
+                }
+            } catch (e) { /* ignore bad cache */ }
+        } else {
+            showSkeleton();
+        }
+
         setupEventListeners();
 
-        // Initial filter for Today's data
-        filteredData = filterData(allData);
-        processAndRender(filteredData);
+        // Background refresh — do NOT await, let it update silently
+        fetchData();
     }
 
     function setupEventListeners() {
@@ -318,30 +334,35 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
 
-            // Try to load cached data for speed (stale-while-revalidate pattern)
-            const cachedBody = localStorage.getItem('farmley_ipqc_data');
-            if (cachedBody && allData.length === 0) {
-                try {
-                    const parsed = JSON.parse(cachedBody);
-                    if (parsed && parsed.length > 0) {
-                        allData = normalizeData(parsed);
-                        allData.forEach(parseRowDate); // pre-parse all dates once
-                        populateStaffFilter(allData);
-                        populateShiftFilter(allData);
-                        filteredData = filterData(allData);
-                        requestAnimationFrame(() => processAndRender(filteredData));
-                    }
-                } catch (e) {
-                    console.error('Cache parsing error:', e);
-                }
-            }
-
             if (allData.length === 0) {
-                renderTable([], dashboardTableBody, true); // Loading state
                 showSkeleton();
             }
 
-            const response = await fetch(`${APPS_SCRIPT_URL}?t=${Date.now()}`);
+            // Build URL with date range params so the server only returns relevant rows
+            const startVal = startDateInput ? startDateInput.value : '';
+            const endVal = endDateInput ? endDateInput.value : '';
+
+            // Widen server window by 1 day each side to handle timezone differences
+            let serverStart = '';
+            let serverEnd = '';
+            if (startVal) {
+                const [sy, sm, sd] = startVal.split('-').map(Number);
+                const sDate = new Date(sy, sm - 1, sd);
+                sDate.setDate(sDate.getDate() - 1);
+                serverStart = sDate.getFullYear() + '-' + String(sDate.getMonth() + 1).padStart(2, '0') + '-' + String(sDate.getDate()).padStart(2, '0');
+            }
+            if (endVal) {
+                const [ey, em, ed] = endVal.split('-').map(Number);
+                const eDate = new Date(ey, em - 1, ed);
+                eDate.setDate(eDate.getDate() + 1);
+                serverEnd = eDate.getFullYear() + '-' + String(eDate.getMonth() + 1).padStart(2, '0') + '-' + String(eDate.getDate()).padStart(2, '0');
+            }
+
+            let url = `${APPS_SCRIPT_URL}?t=${Date.now()}`;
+            if (serverStart) url += `&startDate=${serverStart}`;
+            if (serverEnd)   url += `&endDate=${serverEnd}`;
+
+            const response = await fetch(url);
             const data = await response.json();
 
             console.log(`Fetched ${data.length} records from GSheet`);
@@ -357,11 +378,11 @@ document.addEventListener('DOMContentLoaded', () => {
             localStorage.setItem('farmley_ipqc_data', JSON.stringify(data));
 
             allData = normalizeData(data);
-            allData.forEach(parseRowDate); // pre-parse all dates once on fresh data
+            allData.forEach(parseRowDate);
+            populateProductFilter(allData);
             populateStaffFilter(allData);
             populateShiftFilter(allData);
 
-            // Re-apply current filters to freshly fetched data
             filteredData = filterData(allData);
             requestAnimationFrame(() => {
                 processAndRender(filteredData);
@@ -369,13 +390,14 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         } catch (error) {
             console.error('Error fetching data:', error);
-            allData = normalizeData(mockData);
-            allData.forEach(parseRowDate);
-            filteredData = filterData(allData);
-            requestAnimationFrame(() => processAndRender(filteredData));
+            if (allData.length === 0) {
+                allData = normalizeData(mockData);
+                allData.forEach(parseRowDate);
+                filteredData = filterData(allData);
+                requestAnimationFrame(() => processAndRender(filteredData));
+            }
         } finally {
             if (refreshIcon) {
-                // Ensure rotation lasts at least a bit even if fetch is instant
                 setTimeout(() => refreshIcon.classList.remove('rotating'), 500);
             }
         }
