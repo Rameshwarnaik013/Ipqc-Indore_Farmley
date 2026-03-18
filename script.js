@@ -211,29 +211,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (endDateInput) endDateInput.value = todayStr;
         if (datePreset) datePreset.value = 'today';
 
-        // --- Instant cache boot-up ---
-        // Show cached data immediately (synchronously) so the UI is usable at once
-        const cachedBody = localStorage.getItem('farmley_ipqc_data');
-        if (cachedBody) {
-            try {
-                const parsed = JSON.parse(cachedBody);
-                if (parsed && parsed.length > 0) {
-                    allData = normalizeData(parsed);
-                    allData.forEach(parseRowDate);
-                    populateProductFilter(allData);
-                    populateStaffFilter(allData);
-                    populateShiftFilter(allData);
-                    filteredData = filterData(allData);
-                    requestAnimationFrame(() => processAndRender(filteredData));
-                }
-            } catch (e) { /* ignore bad cache */ }
-        } else {
-            showSkeleton();
-        }
-
+        // Always show skeleton immediately — never show stale cached data on load
+        showSkeleton();
         setupEventListeners();
 
-        // Background refresh — do NOT await, let it update silently
+        // Fetch today's fresh data (no await — skeleton stays visible until data arrives)
         fetchData();
     }
 
@@ -337,29 +319,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 showSkeleton();
             }
 
-            // Build URL with date range params so the server only returns relevant rows
+            // Pass exact date range to server — no buffer needed (server filters to the day)
             const startVal = startDateInput ? startDateInput.value : '';
             const endVal = endDateInput ? endDateInput.value : '';
 
-            // Widen server window by 1 day each side to handle timezone differences
-            let serverStart = '';
-            let serverEnd = '';
-            if (startVal) {
-                const [sy, sm, sd] = startVal.split('-').map(Number);
-                const sDate = new Date(sy, sm - 1, sd);
-                sDate.setDate(sDate.getDate() - 1);
-                serverStart = sDate.getFullYear() + '-' + String(sDate.getMonth() + 1).padStart(2, '0') + '-' + String(sDate.getDate()).padStart(2, '0');
-            }
-            if (endVal) {
-                const [ey, em, ed] = endVal.split('-').map(Number);
-                const eDate = new Date(ey, em - 1, ed);
-                eDate.setDate(eDate.getDate() + 1);
-                serverEnd = eDate.getFullYear() + '-' + String(eDate.getMonth() + 1).padStart(2, '0') + '-' + String(eDate.getDate()).padStart(2, '0');
-            }
-
             let url = `${APPS_SCRIPT_URL}?t=${Date.now()}`;
-            if (serverStart) url += `&startDate=${serverStart}`;
-            if (serverEnd)   url += `&endDate=${serverEnd}`;
+            if (startVal) url += `&startDate=${startVal}`;
+            if (endVal)   url += `&endDate=${endVal}`;
 
             const response = await fetch(url);
             const data = await response.json();
@@ -423,19 +389,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (el) el.innerHTML = '<div class="skeleton skeleton-text" style="width: 100px;"></div>';
         });
 
-        // Skeleton for Table
+        // Skeleton for Table — one shimmer bar per column
         if (dashboardTableBody) {
-            dashboardTableBody.innerHTML = '';
-            for (let i = 0; i < 5; i++) {
-                const tr = document.createElement('tr');
-                tr.className = 'table-skeleton-row';
-                tr.innerHTML = `
-                    <td colspan="11">
-                        <div class="skeleton skeleton-cell"></div>
-                    </td>
-                `;
-                dashboardTableBody.appendChild(tr);
+            let skelHtml = '';
+            for (let i = 0; i < 8; i++) {
+                skelHtml += '<tr class="table-skeleton-row">';
+                for (let c = 0; c < 11; c++) {
+                    skelHtml += '<td><div class="skeleton skeleton-cell"></div></td>';
+                }
+                skelHtml += '</tr>';
             }
+            dashboardTableBody.innerHTML = skelHtml;
         }
     }
 

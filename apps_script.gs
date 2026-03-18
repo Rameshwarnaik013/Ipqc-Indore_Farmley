@@ -44,13 +44,10 @@ function doGet(e) {
     }
   }
 
-  // If no date params given, default to last 30 days so we don't dump entire history
+  // If no date params given, default to TODAY only
   if (!filterStart && !filterEnd) {
-    filterStart = new Date(now);
-    filterStart.setDate(now.getDate() - 30);
-    filterStart.setHours(0, 0, 0, 0);
-    filterEnd = new Date(now);
-    filterEnd.setHours(23, 59, 59, 999);
+    filterStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+    filterEnd   = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
   }
 
   // Find which column is the Date column
