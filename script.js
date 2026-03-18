@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let complianceChart;
 
     // --- Configuration ---
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwU6SaeO7rkTm1diXLcqBgC7N3ELnrjs07kSE_rq0GPV6j9WfqmLNFKL4DvzmeG58Sd/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytbnxDFQ1TyPlMamgBcDdk6kzpTdFisxQzrPO-EoqJHJZlYhEglZ4v388W1khVu1ac/exec';
 
     // --- Product Oxygen % Target Ranges ---
     const productRanges = {
