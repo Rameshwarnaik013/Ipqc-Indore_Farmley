@@ -204,13 +204,12 @@ document.addEventListener('DOMContentLoaded', () => {
     init();
 
     async function init() {
-        // Set default dates to Yesterday
+        // Set default dates to Today
         const now = new Date();
-        const yesterday = new Date(now);
-        yesterday.setDate(now.getDate() - 1);
-        const yStr = yesterday.getFullYear() + '-' + String(yesterday.getMonth() + 1).padStart(2, '0') + '-' + String(yesterday.getDate()).padStart(2, '0');
-        if (startDateInput) startDateInput.value = yStr;
-        if (endDateInput) endDateInput.value = yStr;
+        const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+        if (startDateInput) startDateInput.value = todayStr;
+        if (endDateInput) endDateInput.value = todayStr;
+        if (datePreset) datePreset.value = 'today';
 
         // --- Instant cache boot-up ---
         // Show cached data immediately (synchronously) so the UI is usable at once
