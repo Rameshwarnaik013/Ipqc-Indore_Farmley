@@ -101,6 +101,17 @@ function doGet(e) {
     result.push(obj);
   }
 
+  // Sort by date descending — latest entries come first in the response
+  if (dateColIndex >= 0) {
+    result.sort(function(a, b) {
+      var da = a[headers[dateColIndex]];
+      var db = b[headers[dateColIndex]];
+      var ta = da ? new Date(da).getTime() : 0;
+      var tb = db ? new Date(db).getTime() : 0;
+      return tb - ta; // descending
+    });
+  }
+
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
