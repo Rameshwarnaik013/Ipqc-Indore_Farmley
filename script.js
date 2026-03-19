@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sizeCountEl = document.getElementById('sizeCount');
     const oxygenCountEl = document.getElementById('oxygenCount');
 
-    const lastUpdatedEl = document.getElementById('lastUpdated');
+
     const navItems = document.querySelectorAll('.nav-item');
     const tabContents = document.querySelectorAll('.tab-content');
     const dashboardTableBody = document.getElementById('dashboardTableBody');
@@ -330,7 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Fetch error:', error);
-            if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
             if (allData.length === 0) {
                 allData = normalizeData(mockData || []);
                 allData.forEach(parseRowDate);
