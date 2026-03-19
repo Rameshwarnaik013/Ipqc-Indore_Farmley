@@ -75,19 +75,7 @@ tr.row-failure td {
     cursor: pointer;
     font-weight: 500;
     color: var(--text-secondary);
-    transition: all 0.2s ease;
-    width: fit-content;
-}
-
-.btn-secondary {
-    background: #4b5563;
-    color: white;
-}
-
-.btn-secondary:hover {
-    background: #374151;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s;
 }
 
 .nav-item:hover,
@@ -173,24 +161,17 @@ tr.row-failure td {
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
-    min-width: 0;
-    overflow-x: hidden;
 }
 
 .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-    min-width: 0;
 }
 
 .header h1 {
-    font-size: 1.5rem;
+    font-size: 1.875rem;
     font-weight: 700;
-    flex-shrink: 1;
-    min-width: 0;
 }
 
 .badge {
@@ -206,14 +187,7 @@ tr.row-failure td {
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 0.625rem;
-    flex-wrap: wrap;
-    flex-shrink: 0;
-}
-
-.header-actions .btn {
-    width: auto;
-    white-space: nowrap;
+    gap: 1.5rem;
 }
 
 .text-secondary {
@@ -227,8 +201,8 @@ tr.row-failure td {
 /* Stats Overview */
 .stats-overview {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.25rem;
 }
 
 .stat-card {
@@ -258,14 +232,12 @@ tr.row-failure td {
 }
 
 .stat-title {
-    font-size: 0.72rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.025em;
-    white-space: normal;
-    line-height: 1.3;
 }
 
 .stat-value {
@@ -339,29 +311,32 @@ tr.row-failure td {
 
 table {
     width: 100%;
-    min-width: 4500px; /* Increased for 55 columns */
     border-collapse: collapse;
-    font-size: 0.85rem;
+    table-layout: fixed;
+    /* Force precise column widths */
 }
 
 th {
     background-color: #f8fafc;
     text-align: left;
-    padding: 0.75rem 0.5rem;
-    font-size: 0.7rem;
+    padding: 0.5rem 0.3rem;
+    font-size: 0.6rem;
     font-weight: 700;
     text-transform: uppercase;
     color: var(--text-secondary);
     border-bottom: 2px solid var(--border);
     white-space: normal;
     vertical-align: bottom;
-    line-height: 1.2;
+    line-height: 1.1;
+    overflow: hidden;
 }
 
 td {
-    padding: 0.75rem 0.5rem;
-    font-size: 0.8rem;
+    padding: 0.5rem 0.3rem;
+    font-size: 0.75rem;
     border-bottom: 1px solid var(--border);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
 
@@ -371,10 +346,67 @@ td {
     font-weight: 700 !important;
 }
 
-/* Base column widths for better alignment */
-tr th:nth-child(1), tr td:nth-child(1) { width: 100px; } /* Date */
-tr th:nth-child(2), tr td:nth-child(2) { width: 250px; white-space: normal; } /* Product Name */
-tr th:nth-child(3), tr td:nth-child(3) { width: 100px; text-align: center; } /* Machine */
+/* Precise Column Width Allocation */
+tr th:nth-child(1),
+tr td:nth-child(1) {
+    width: 95px;
+}
+
+/* Date */
+tr th:nth-child(2),
+tr td:nth-child(2) {
+    width: auto;
+    white-space: normal;
+    line-height: 1.2;
+    font-size: 0.7rem;
+}
+
+/* Product Name */
+tr th:nth-child(3),
+tr td:nth-child(3),
+tr th:nth-child(4),
+tr td:nth-child(4),
+tr th:nth-child(5),
+tr td:nth-child(5) {
+    width: 45px;
+    text-align: center;
+}
+
+/* Quality Checks */
+tr th:nth-child(6),
+tr td:nth-child(6),
+tr th:nth-child(7),
+tr td:nth-child(7) {
+    width: 85px;
+    text-align: center;
+}
+
+/* Uniformity */
+tr th:nth-child(8),
+tr td:nth-child(8) {
+    width: 60px;
+    text-align: center;
+}
+
+/* Nitrogen */
+tr th:nth-child(9),
+tr td:nth-child(9) {
+    width: 60px;
+    text-align: center;
+}
+
+/* Oxygen */
+tr th:nth-child(10),
+tr td:nth-child(10) {
+    width: 50px;
+    text-align: center;
+}
+
+/* Shift */
+tr th:nth-child(11),
+tr td:nth-child(11) {
+    width: 70px;
+}
 
 /* Staff */
 
