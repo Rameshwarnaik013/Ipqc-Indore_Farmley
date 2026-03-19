@@ -1,7 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     // DOM Elements
-    // const tableBody = document.getElementById('tableBody');
     const syncBtn = document.getElementById('syncData');
+    const downloadExcelBtn = document.getElementById('downloadExcel');
     const applyFiltersBtn = document.getElementById('applyFilters');
     const productFilter = document.getElementById('productFilter');
     const totalRecordsEl = document.getElementById('totalRecords');
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let complianceChart;
 
     // --- Configuration ---
-    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbytbnxDFQ1TyPlMamgBcDdk6kzpTdFisxQzrPO-EoqJHJZlYhEglZ4v388W1khVu1ac/exec';
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNVAaFAR1aMuJlk9vUWljryMv9HgRvGendH_mmqweCYp6dV0q48l-49_myQRudgwBo/exec';
 
     // --- Product Oxygen % Target Ranges ---
     const productRanges = {
@@ -177,46 +177,54 @@ document.addEventListener('DOMContentLoaded', () => {
         "Salted Pumpkin Seeds Pillow Pouch Farmley 24g-Ladi"
     ]);
 
-    // Normalise: force Material Uniformity to 'NA' for products in the NA list
     function normalizeData(data) {
         return data.map(row => {
-            const product = String(row['Product Name'] || '').trim();
-            if (MATERIAL_NA_PRODUCTS.has(product)) {
-                return { ...row, 'Material Uniformity (Mixing)': 'NA' };
+            const normalizedRow = {};
+            for (let key in row) {
+                const normKey = key.trim().replace(/\s+/g, ' ');
+                normalizedRow[normKey] = row[key];
             }
-            return row;
+            const productName = String(normalizedRow['Product Name'] || '').trim();
+            if (MATERIAL_NA_PRODUCTS.has(productName)) {
+                normalizedRow['Material Uniformity (Mixing)'] = 'NA';
+            }
+            for (let key in normalizedRow) {
+                if (key !== '_parsedDate') {
+                    normalizedRow[key] = translateValue(normalizedRow[key]);
+                }
+            }
+            if (!normalizedRow['Machine'] || normalizedRow['Machine'] === 'N/A') {
+                normalizedRow['Machine'] = normalizedRow['Table No'] || 'N/A';
+            }
+            return normalizedRow;
         });
     }
 
-    // --- Mock Data ---
-    const mockData = [
-        { "Date": "2026-02-04", "Product Name": "Date Powder Farmley Standee pouch 200 g", "Lumps": "No", "Leakage Test": "Yes", "Pack & Seal Integrity": "Yes", "Material Uniformity (Mixing)": "Yes", "Size Uniformity (Slice of Mixes)": "Yes", "Nitrogen Flush": "Yes", "Oxygen % Check": "2.5", "Shift": "Day", "Checked By": "Deepak" },
-        { "Date": "2026-02-04", "Product Name": "Popular California Almonds Farmley Standee Pouch 1 kg", "Lumps": "No", "Leakage Test": "Yes", "Pack & Seal Integrity": "Yes", "Material Uniformity (Mixing)": "Yes", "Size Uniformity (Slice of Mixes)": "Yes", "Nitrogen Flush": "Yes", "Oxygen % Check": "9.2", "Shift": "Day", "Checked By": "Saloni" },
-        { "Date": "2026-02-04", "Product Name": "Smokey Almond Farmley 50g", "Lumps": "Yes", "Leakage Test": "No", "Pack & Seal Integrity": "No", "Material Uniformity (Mixing)": "No", "Size Uniformity (Slice of Mixes)": "No", "Nitrogen Flush": "No", "Oxygen % Check": "4.5", "Shift": "Night", "Checked By": "John" }
-    ];
+    function translateValue(val) {
+        if (val === null || val === undefined) return val;
+        const s = String(val).trim().toLowerCase();
+        if (s === 'okay' || s === 'ok') return 'Yes';
+        if (s === 'not okay' || s === 'not ok') return 'No';
+        if (s === 'n/a' || s === 'na') return 'N/A';
+        return val;
+    }
 
-    const refreshBtn = document.getElementById('refreshData');
     const refreshIcon = document.getElementById('refreshIcon');
-
     const startDateInput = document.getElementById('startDate');
     const endDateInput = document.getElementById('endDate');
 
     init();
 
     async function init() {
-        // Set default dates to Today
         const now = new Date();
         const todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
         if (startDateInput) startDateInput.value = todayStr;
         if (endDateInput) endDateInput.value = todayStr;
         if (datePreset) datePreset.value = 'today';
 
-        // Step 1: Show skeleton immediately
         showSkeleton();
         setupEventListeners();
 
-        // Step 2: If we have ANY cached data, show it right away so the screen isn't blank
-        // This gives instant feedback while the Apps Script warms up in background
         const cachedBody = localStorage.getItem('farmley_ipqc_data');
         if (cachedBody) {
             try {
@@ -228,29 +236,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     populateStaffFilter(allData);
                     populateShiftFilter(allData);
                     filteredData = filterData(allData);
-                    requestAnimationFrame(() => {
-                        processAndRender(filteredData);
-                        if (lastUpdatedEl) lastUpdatedEl.textContent = 'Showing cached data — syncing latest...';
-                    });
+                    processAndRender(filteredData);
+                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Showing cached data — syncing live...';
                 }
-            } catch (e) { /* ignore bad cache */ }
+            } catch (e) { console.warn("Cache parse failed", e); }
         }
-
-        // Step 3: Fetch fresh today-only data in background (doesn't block UI)
         fetchData();
     }
 
     function setupEventListeners() {
-
         if (applyFiltersBtn) {
             applyFiltersBtn.addEventListener('click', () => {
-                if (allData.length === 0) return; // data not loaded yet
+                if (allData.length === 0) return; 
                 filteredData = filterData(allData);
                 processAndRender(filteredData);
             });
         }
-
-        // Auto-apply for all filters — guard against empty allData during load
         [productFilter, nitrogenFilter, shiftFilter, checkedByFilter].forEach(filter => {
             if (filter) {
                 filter.addEventListener('change', () => {
@@ -260,201 +261,144 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         });
-
-        if (syncBtn) {
-            syncBtn.addEventListener('click', () => {
-                fetchData();
-            });
-        }
-
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', () => {
-                fetchData();
-            });
-        }
-
+        if (syncBtn) syncBtn.addEventListener('click', () => fetchData());
+        if (downloadExcelBtn) downloadExcelBtn.addEventListener('click', () => exportToExcel());
         if (datePreset) {
             datePreset.addEventListener('change', () => {
                 const val = datePreset.value;
                 if (val === 'custom') return;
-
                 const now = new Date();
                 let start = new Date();
                 let end = new Date();
-
-                if (val === 'today') {
-                    // today already set
-                } else if (val === 'yesterday') {
-                    start.setDate(now.getDate() - 1);
-                    end.setDate(now.getDate() - 1);
-                } else if (val === 'last7days') {
-                    start.setDate(now.getDate() - 6);
-                }
-
+                if (val === 'today') {} 
+                else if (val === 'yesterday') { start.setDate(now.getDate() - 1); end.setDate(now.getDate() - 1); }
+                else if (val === 'last7days') { start.setDate(now.getDate() - 6); }
                 startDateInput.value = start.getFullYear() + '-' + String(start.getMonth() + 1).padStart(2, '0') + '-' + String(start.getDate()).padStart(2, '0');
                 endDateInput.value = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
-
-                // When changing date range, trigger a fresh server fetch with the new dates
-                // (only filter locally if we already have data for that range)
-                if (allData.length > 0) {
-                    filteredData = filterData(allData);
-                    processAndRender(filteredData);
-                }
-                fetchData();
+                if (allData.length > 0) { filteredData = filterData(allData); processAndRender(filteredData); }
             });
         }
-
-        [startDateInput, endDateInput].forEach(inp => {
-            if (inp) {
-                inp.addEventListener('change', () => {
-                    if (datePreset) datePreset.value = 'custom';
-                    if (allData.length > 0) {
-                        filteredData = filterData(allData);
-                        processAndRender(filteredData);
-                    }
-                    fetchData();
-                });
-            }
-        });
     }
 
-    // Pre-parse a date from a raw value and cache it on the row object
     function parseRowDate(row) {
-        if (row._parsedDate !== undefined) return; // already parsed
+        if (row._parsedDate !== undefined) return;
         const raw = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
         if (!raw) { row._parsedDate = null; return; }
-
         if (typeof raw === 'string') {
             const INformat = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-            if (INformat) {
-                row._parsedDate = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
-                return;
-            }
+            if (INformat) { row._parsedDate = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10)); return; }
         }
         const d = new Date(raw);
-        if (!isNaN(d.getTime())) {
-            // Normalise to midnight
-            row._parsedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        } else {
-            row._parsedDate = null;
-        }
+        if (!isNaN(d.getTime())) { row._parsedDate = new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+        else { row._parsedDate = null; }
     }
 
     async function fetchData() {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
-            if (lastUpdatedEl && allData.length > 0) {
-                lastUpdatedEl.textContent = 'Syncing latest data...';
+            if (lastUpdatedEl && allData.length > 0) lastUpdatedEl.textContent = 'Syncing latest data...';
+
+            // --- Tiered Fetching Strategy ---
+            // Stage 1: Fast fetch for Today & Yesterday
+            const now = new Date();
+            const yesterday = new Date(now);
+            yesterday.setDate(now.getDate() - 1);
+            
+            const formatDateParam = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+            const startDateParam = formatDateParam(yesterday);
+            const endDateParam = formatDateParam(now);
+
+            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Fetching Today/Yesterday...';
+            
+            // Short timeout for Stage 1 (15s)
+            const partialData = await fetchWithTimeout(`${APPS_SCRIPT_URL}?startDate=${startDateParam}&endDate=${endDateParam}&t=${Date.now()}`, 15000);
+            
+            if (partialData && partialData.length > 0) {
+                updateAllData(partialData);
+                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Recent data loaded. Fetching history...';
             }
 
-            if (allData.length === 0) {
-                showSkeleton();
-            }
-
-            // Pass exact date range to server
-            const startVal = startDateInput ? startDateInput.value : '';
-            const endVal = endDateInput ? endDateInput.value : '';
-
-            let url = `${APPS_SCRIPT_URL}?t=${Date.now()}`;
-            if (startVal) url += `&startDate=${startVal}`;
-            if (endVal)   url += `&endDate=${endVal}`;
-
-            // 25-second timeout — Apps Script can be slow on cold start
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000);
-
-            let response;
-            try {
-                response = await fetch(url, { signal: controller.signal });
-            } finally {
-                clearTimeout(timeoutId);
-            }
-
-            const data = await response.json();
-            console.log(`Fetched ${data.length} records from GSheet`);
-
-            if (data.error) {
-                console.error('Server error:', data.error);
-                if (allData.length === 0) {
-                    dashboardTableBody.innerHTML = `<tr><td colspan="11" class="loading" style="color:#ef4444">Server Error: ${data.error}</td></tr>`;
-                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Fetch failed — showing cached data';
-                }
-                return;
-            }
-
-            localStorage.setItem('farmley_ipqc_data', JSON.stringify(data));
-
-            allData = normalizeData(data);
-            allData.forEach(parseRowDate);
-            populateProductFilter(allData);
-            populateStaffFilter(allData);
-            populateShiftFilter(allData);
-
-            filteredData = filterData(allData);
-            requestAnimationFrame(() => {
-                processAndRender(filteredData);
+            // Stage 2: Background fetch for full history (last 30 days)
+            // Longer timeout for Stage 2 (60s)
+            const fullData = await fetchWithTimeout(`${APPS_SCRIPT_URL}?t=${Date.now()}`, 60000);
+            
+            if (fullData && fullData.length > 0) {
+                localStorage.setItem('farmley_ipqc_data', JSON.stringify(fullData));
+                updateAllData(fullData);
                 if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-            });
+            }
 
         } catch (error) {
-            if (error.name === 'AbortError') {
-                console.warn('Fetch timed out after 25s — Apps Script cold start too slow');
-                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Sync timed out — showing cached data';
-            } else {
-                console.error('Error fetching data:', error);
-            }
-            // If we have no data at all, fall back to mock data so screen isn't blank
+            console.error('Fetch error:', error);
+            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Sync failed — showing last cached data';
             if (allData.length === 0) {
-                allData = normalizeData(mockData);
+                allData = normalizeData(mockData || []);
                 allData.forEach(parseRowDate);
                 filteredData = filterData(allData);
-                requestAnimationFrame(() => {
-                    processAndRender(filteredData);
-                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Could not reach server — showing demo data';
-                });
+                processAndRender(filteredData);
             }
         } finally {
-            if (refreshIcon) {
-                setTimeout(() => refreshIcon.classList.remove('rotating'), 500);
-            }
+            if (refreshIcon) setTimeout(() => refreshIcon.classList.remove('rotating'), 500);
         }
     }
 
-    function processAndRender(data) {
-        // Sort newest date first so today's entries appear at the top immediately
-        const sorted = [...data].sort((a, b) => {
-            const da = a._parsedDate ? a._parsedDate.getTime() : 0;
-            const db = b._parsedDate ? b._parsedDate.getTime() : 0;
-            return db - da; // descending — latest date first
+    async function fetchWithTimeout(url, timeout) {
+        const controller = new AbortController();
+        const id = setTimeout(() => controller.abort(), timeout);
+        try {
+            const response = await fetch(url, { signal: controller.signal });
+            return await response.json();
+        } finally {
+            clearTimeout(id);
+        }
+    }
+
+    function updateAllData(newData) {
+        const processed = normalizeData(newData);
+        processed.forEach(parseRowDate);
+        
+        // Merge with existing allData or replace if it's a large set
+        if (newData.length < 500) { 
+            const map = new Map();
+            // Use a combination of Date, Time and Product as a fallback unique key if ID is missing
+            const getKey = (r) => r.ID || `${r.Date}-${r.Time}-${r['Product Name']}`;
+            
+            allData.forEach(r => map.set(getKey(r), r));
+            processed.forEach(r => map.set(getKey(r), r));
+            allData = Array.from(map.values());
+        } else {
+            allData = processed;
+        }
+
+        populateProductFilter(allData);
+        populateStaffFilter(allData);
+        populateShiftFilter(allData);
+        filteredData = filterData(allData);
+        
+        if (filteredData.length === 0 && allData.length > 0) {
+            filteredData = showLatestAvailableDate(allData);
+        }
+
+        requestAnimationFrame(() => {
+            processAndRender(filteredData);
         });
+    }
+
+    function processAndRender(data) {
+        const sorted = [...data].sort((a, b) => (b._parsedDate ? b._parsedDate.getTime() : 0) - (a._parsedDate ? a._parsedDate.getTime() : 0));
         renderTable(sorted, dashboardTableBody);
         renderCharts(sorted);
         updateStats(sorted);
     }
 
     function showSkeleton() {
-        // Skeleton for Stats
         const statValues = ['totalRecords', 'lumpsCompliance', 'leakageCompliance', 'sealCompliance', 'materialCompliance', 'sizeCompliance', 'oxygenCompliance'];
-        const statDescs = ['lumpsCount', 'leakageCount', 'sealCount', 'materialCount', 'sizeCount', 'oxygenCount'];
-
-        statValues.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = '<div class="skeleton skeleton-value"></div>';
-        });
-
-        statDescs.forEach(id => {
-            const el = document.getElementById(id);
-            if (el) el.innerHTML = '<div class="skeleton skeleton-text" style="width: 100px;"></div>';
-        });
-
-        // Skeleton for Table — one shimmer bar per column
+        statValues.forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = '<div class="skeleton skeleton-value"></div>'; });
         if (dashboardTableBody) {
             let skelHtml = '';
-            for (let i = 0; i < 8; i++) {
+            for (let i = 0; i < 6; i++) {
                 skelHtml += '<tr class="table-skeleton-row">';
-                for (let c = 0; c < 11; c++) {
-                    skelHtml += '<td><div class="skeleton skeleton-cell"></div></td>';
-                }
+                for (let c = 0; c < 15; c++) skelHtml += '<td><div class="skeleton skeleton-cell"></div></td>';
                 skelHtml += '</tr>';
             }
             dashboardTableBody.innerHTML = skelHtml;
@@ -464,199 +408,74 @@ document.addEventListener('DOMContentLoaded', () => {
     function getOxygenStatus(productName, value) {
         const val = parseFloat(value);
         if (isNaN(val)) return 'neutral';
-
         const range = productRanges[productName];
-        if (!range) return 'compliant'; // If no range, we count it as compliant/valid check for the denominator
-
+        if (!range) return 'compliant';
         return (val <= range[1]) ? 'compliant' : 'non-compliant';
     }
-
 
     function updateStats(data) {
         const total = data.length;
         if (total === 0) {
-            const zeros = ['totalRecords', 'lumpsCompliance', 'leakageCompliance', 'sealCompliance', 'materialCompliance', 'sizeCompliance', 'oxygenCompliance'];
-            zeros.forEach(id => document.getElementById(id).textContent = '0%');
+            ['totalRecords', 'lumpsCompliance', 'leakageCompliance', 'sealCompliance', 'materialCompliance', 'sizeCompliance', 'oxygenCompliance'].forEach(id => {
+               const el = document.getElementById(id); if (el) el.textContent = '0%';
+            });
             totalRecordsEl.textContent = '0';
             return;
         }
-
-        // Helper to calculate compliance % excluding N/A
         const calcComp = (key, passVal) => {
             const relevant = data.filter(r => r[key] && String(r[key]).toLowerCase() !== 'n/a');
             if (relevant.length === 0) return { percent: 'N/A', count: 0, total: 0 };
             const passed = relevant.filter(r => String(r[key]).toLowerCase() === passVal.toLowerCase()).length;
-            return {
-                percent: ((passed / relevant.length) * 100).toFixed(1),
-                count: passed,
-                total: relevant.length
-            };
+            return { percent: ((passed / relevant.length) * 100).toFixed(1), count: passed, total: relevant.length };
         };
-
-        // Material Uniformity: treat as NA by default — only count explicit Yes/No values
         const calcMaterial = () => {
             const relevant = data.filter(r => {
-                const v = String(r['Material Uniformity (Mixing)'] || '').toLowerCase().trim();
-                return v === 'yes' || v === 'no';
+                const v = String(r['Material Uniformity (Mixing)'] || r['rial Uniformity (Mack & Seal)'] || '').toLowerCase().trim();
+                return v === 'yes' || v === 'no' || v === 'ok' || v === 'not ok';
             });
             if (relevant.length === 0) return { percent: 'N/A', count: 0, total: 0 };
-            const passed = relevant.filter(r => String(r['Material Uniformity (Mixing)']).toLowerCase().trim() === 'yes').length;
-            return {
-                percent: ((passed / relevant.length) * 100).toFixed(1),
-                count: passed,
-                total: relevant.length
-            };
+            const passed = relevant.filter(r => {
+                const v = String(r['Material Uniformity (Mixing)'] || r['rial Uniformity (Mack & Seal)'] || '').toLowerCase().trim();
+                return v === 'yes' || v === 'ok';
+            }).length;
+            return { percent: ((passed / relevant.length) * 100).toFixed(1), count: passed, total: relevant.length };
         };
-
         const lumps = calcComp('Lumps', 'No');
         const leakage = calcComp('Leakage Test', 'Yes');
         const seal = calcComp('Pack & Seal Integrity', 'Yes');
         const material = calcMaterial();
         const size = calcComp('Size Uniformity (Slice of Mixes)', 'Yes');
-
-        const oxygenChecked = data.filter(r => {
-            const val = parseFloat(r['Oxygen % Check']);
-            return !isNaN(val);
-        });
+        const oxygenChecked = data.filter(r => !isNaN(parseFloat(r['Oxygen % Check'])));
         const compliantOxygen = oxygenChecked.filter(r => getOxygenStatus(r['Product Name'], r['Oxygen % Check']) === 'compliant').length;
         const oxygenPercent = oxygenChecked.length > 0 ? ((compliantOxygen / oxygenChecked.length) * 100).toFixed(1) : 'N/A';
-
-        const updateCardUI = (cardId, percent) => {
-            const cardEl = document.getElementById(cardId);
-            if (!cardEl) return;
-            const card = cardEl.closest('.stat-card');
-            if (!card) return;
-            card.classList.remove('high-compliance', 'mid-compliance', 'low-compliance');
-            if (percent === 'N/A') return;
-            const p = parseFloat(percent);
-            if (p >= 95) card.classList.add('high-compliance');
-            else if (p >= 80) card.classList.add('mid-compliance');
-            else card.classList.add('low-compliance');
-        };
-
         totalRecordsEl.textContent = total;
-
-        const setVal = (el, val) => el.textContent = val === 'N/A' ? 'N/A' : `${val}%`;
-        setVal(lumpsComplianceEl, lumps.percent);
-        setVal(leakageComplianceEl, leakage.percent);
-        setVal(sealComplianceEl, seal.percent);
-        setVal(materialComplianceEl, material.percent);
-        setVal(sizeComplianceEl, size.percent);
-        setVal(oxygenComplianceEl, oxygenPercent);
-
-        lumpsCountEl.textContent = `${lumps.count} / ${lumps.total} compliant`;
-        leakageCountEl.textContent = `${leakage.count} / ${leakage.total} compliant`;
-        sealCountEl.textContent = `${seal.count} / ${seal.total} compliant`;
-        materialCountEl.textContent = `${material.count} / ${material.total} compliant`;
-        sizeCountEl.textContent = `${size.count} / ${size.total} compliant`;
-        oxygenCountEl.textContent = oxygenPercent === 'N/A' ? 'N/A' : `${compliantOxygen} / ${oxygenChecked.length} compliant`;
-
-        updateCardUI('lumpsCompliance', lumps.percent);
-        updateCardUI('leakageCompliance', leakage.percent);
-        updateCardUI('sealCompliance', seal.percent);
-        updateCardUI('materialCompliance', material.percent);
-        updateCardUI('sizeCompliance', size.percent);
-        updateCardUI('oxygenCompliance', oxygenPercent);
+        const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val === 'N/A' ? 'N/A' : `${val}%`; };
+        setVal('lumpsCompliance', lumps.percent); setVal('leakageCompliance', leakage.percent); setVal('sealCompliance', seal.percent); setVal('materialCompliance', material.percent); setVal('sizeCompliance', size.percent); setVal('oxygenCompliance', oxygenPercent);
     }
 
     function renderCharts(data) {
         if (complianceChart) complianceChart.destroy();
-
-        const labels = ['Lumps', 'Leakage', 'Pack & Seal', 'Material Uniformity (Mixing)', 'Size Uniformity (Slice of Mixes)', 'Oxygen %'];
-        const passData = [];
-        const failData = [];
-
+        const labels = ['Lumps', 'Leakage', 'Pack & Seal', 'Material Uniformity', 'Size Uniformity', 'Oxygen %'];
+        const passData = [], failData = [];
         const getStatsBreakdown = (key, passVal) => {
             const rel = data.filter(r => r[key] && String(r[key]).toLowerCase() !== 'n/a');
             if (rel.length === 0) return { pass: 0, fail: 0 };
             const pass = rel.filter(r => String(r[key]).toLowerCase() === passVal.toLowerCase()).length;
             return { pass, fail: rel.length - pass };
         };
-
-        // Lumps (No = Pass)
         const l = getStatsBreakdown('Lumps', 'No'); passData.push(l.pass); failData.push(l.fail);
-        // Leakage (Yes = Pass)
         const lk = getStatsBreakdown('Leakage Test', 'Yes'); passData.push(lk.pass); failData.push(lk.fail);
-        // Seal (Yes = Pass)
         const s = getStatsBreakdown('Pack & Seal Integrity', 'Yes'); passData.push(s.pass); failData.push(s.fail);
-        // Material Uniformity: only count explicit Yes/No (NA by default)
-        const mRel = data.filter(r => { const v = String(r['Material Uniformity (Mixing)'] || '').toLowerCase().trim(); return v === 'yes' || v === 'no'; });
-        const mPass = mRel.filter(r => String(r['Material Uniformity (Mixing)']).toLowerCase().trim() === 'yes').length;
-        passData.push(mPass); failData.push(mRel.length - mPass);
-        // Size (Yes = Pass)
+        const mPass = data.filter(r => { const v = String(r['Material Uniformity (Mixing)'] || r['rial Uniformity (Mack & Seal)'] || '').toLowerCase(); return v === 'yes' || v === 'ok'; }).length;
+        const mRelCount = data.filter(r => { const v = String(r['Material Uniformity (Mixing)'] || r['rial Uniformity (Mack & Seal)'] || '').toLowerCase(); return v === 'yes' || v === 'no' || v === 'ok' || v === 'not ok'; }).length;
+        passData.push(mPass); failData.push(mRelCount - mPass);
         const sz = getStatsBreakdown('Size Uniformity (Slice of Mixes)', 'Yes'); passData.push(sz.pass); failData.push(sz.fail);
-        // Oxygen
-        const oxygenChecked = data.filter(r => productRanges[r['Product Name']] && String(r['Oxygen % Check']).toLowerCase() !== 'n/a');
+        const oxygenChecked = data.filter(r => !isNaN(parseFloat(r['Oxygen % Check'])));
         const oxyPass = oxygenChecked.filter(r => getOxygenStatus(r['Product Name'], r['Oxygen % Check']) === 'compliant').length;
         passData.push(oxyPass); failData.push(oxygenChecked.length - oxyPass);
-
         complianceChart = new Chart(document.getElementById('complianceChart'), {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [
-                    {
-                        label: 'Pass',
-                        data: passData,
-                        backgroundColor: '#10b981',
-                        borderRadius: 6,
-                        categoryPercentage: 0.6,
-                        barPercentage: 0.8
-                    },
-                    {
-                        label: 'Fail',
-                        data: failData,
-                        backgroundColor: '#ef4444',
-                        borderRadius: 6,
-                        categoryPercentage: 0.6,
-                        barPercentage: 0.8
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                indexAxis: 'x',
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: { display: false }
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: { color: '#f3f4f6' },
-                        title: { display: true, text: 'Count of Checks' }
-                    }
-                },
-                plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        align: 'end',
-                        labels: {
-                            usePointStyle: true,
-                            boxWidth: 8
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(31, 41, 55, 0.9)',
-                        padding: 12,
-                        titleFont: { size: 14 },
-                        bodyFont: { size: 13 },
-                        callbacks: {
-                            label: function (context) {
-                                let label = context.dataset.label || '';
-                                let value = context.parsed.y;
-                                let idx = context.dataIndex;
-                                let total = passData[idx] + failData[idx];
-                                let percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-                                return ` ${label}: ${value} (${percentage}%)`;
-                            }
-                        }
-                    }
-                }
-            }
+            type: 'bar', data: { labels: labels, datasets: [{ label: 'Pass', data: passData, backgroundColor: '#10b981', borderRadius: 4 }, { label: 'Fail', data: failData, backgroundColor: '#ef4444', borderRadius: 4 }] },
+            options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } }, plugins: { legend: { position: 'top', align: 'end' } } }
         });
     }
 
@@ -665,51 +484,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const nitrogen = nitrogenFilter ? nitrogenFilter.value : 'all';
         const shift = shiftFilter ? shiftFilter.value : 'all';
         const checkedBy = checkedByFilter ? checkedByFilter.value : 'all';
-        const startVal = startDateInput.value;
-        const endVal = endDateInput.value;
-
-        // Parse filter boundary dates once (not per row)
-        let startDate = null;
-        if (startVal) {
-            const [y, m, d] = startVal.split('-').map(Number);
-            startDate = new Date(y, m - 1, d);
-        }
-        let endDate = null;
-        if (endVal) {
-            const [y, m, d] = endVal.split('-').map(Number);
-            endDate = new Date(y, m - 1, d);
-        }
-
-        const filterShiftLow = shift.trim().toLowerCase();
-        const nitrogenLow = nitrogen.toLowerCase();
-
+        const startVal = startDateInput.value, endVal = endDateInput.value;
+        let startDate = startVal ? new Date(startVal.split('-')[0], startVal.split('-')[1]-1, startVal.split('-')[2]) : null;
+        let endDate = endVal ? new Date(endVal.split('-')[0], endVal.split('-')[1]-1, endVal.split('-')[2]) : null;
         return data.filter(row => {
-            // Product filter
             if (product !== 'all' && row['Product Name'] !== product) return false;
-
-            // Date filter — use pre-parsed _parsedDate (set by parseRowDate)
-            if (startDate || endDate) {
-                const rd = row._parsedDate;
-                if (!rd) return false;
-                if (startDate && rd < startDate) return false;
-                if (endDate && rd > endDate) return false;
-            }
-
-            // Nitrogen Flush filter
-            if (nitrogen !== 'all') {
-                const rowNitrogen = String(row['Nitrogen Flush'] || '').trim().toLowerCase();
-                if (rowNitrogen !== nitrogenLow) return false;
-            }
-
-            // Shift filter
-            if (filterShiftLow !== 'all') {
-                const rowShift = String(row['Shift'] || '').trim().toLowerCase();
-                if (rowShift !== filterShiftLow) return false;
-            }
-
-            // Staff filter
+            if (startDate || endDate) { const rd = row._parsedDate; if (!rd) return false; if (startDate && rd < startDate) return false; if (endDate && rd > endDate) return false; }
+            if (nitrogen !== 'all' && String(row['Nitrogen Flush'] || '').toLowerCase() !== nitrogen.toLowerCase()) return false;
+            if (shift !== 'all' && String(row['Shift'] || '').toLowerCase() !== shift.toLowerCase()) return false;
             if (checkedBy !== 'all' && row['Checked By'] !== checkedBy) return false;
-
             return true;
         });
     }
@@ -717,134 +500,146 @@ document.addEventListener('DOMContentLoaded', () => {
     function populateStaffFilter(data) {
         if (!checkedByFilter) return;
         const staff = [...new Set(data.map(item => item['Checked By']).filter(Boolean))].sort();
-        const currentVal = checkedByFilter.value;
-        // Build with DocumentFragment for a single DOM write
         const frag = document.createDocumentFragment();
-        const allOpt = document.createElement('option');
-        allOpt.value = 'all'; allOpt.textContent = 'All Staff';
-        frag.appendChild(allOpt);
-        staff.forEach(name => {
-            const option = document.createElement('option');
-            option.value = name;
-            option.textContent = name;
-            frag.appendChild(option);
-        });
-        checkedByFilter.innerHTML = '';
-        checkedByFilter.appendChild(frag);
-        if (staff.includes(currentVal)) checkedByFilter.value = currentVal;
+        const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'All Staff'; frag.appendChild(allOpt);
+        staff.forEach(name => { const opt = document.createElement('option'); opt.value = name; opt.textContent = name; frag.appendChild(opt); });
+        checkedByFilter.innerHTML = ''; checkedByFilter.appendChild(frag);
     }
 
     function populateShiftFilter(data) {
         if (!shiftFilter) return;
         const shifts = [...new Set(data.map(item => item['Shift']).filter(Boolean))].sort();
-        const currentVal = shiftFilter.value;
-        // Build with DocumentFragment for a single DOM write
         const frag = document.createDocumentFragment();
-        const allOpt = document.createElement('option');
-        allOpt.value = 'all'; allOpt.textContent = 'All Shifts';
-        frag.appendChild(allOpt);
-        shifts.forEach(s => {
-            const option = document.createElement('option');
-            option.value = s;
-            option.textContent = s;
-            frag.appendChild(option);
-        });
-        shiftFilter.innerHTML = '';
-        shiftFilter.appendChild(frag);
-        if (shifts.includes(currentVal)) shiftFilter.value = currentVal;
+        const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'All Shifts'; frag.appendChild(allOpt);
+        shifts.forEach(s => { const opt = document.createElement('option'); opt.value = s; opt.textContent = s; frag.appendChild(opt); });
+        shiftFilter.innerHTML = ''; shiftFilter.appendChild(frag);
     }
 
     function checkRowFailure(row) {
-        const lpFail = String(row['Lumps'] || '').toLowerCase() === 'yes';
-        const lkFail = String(row['Leakage Test'] || '').toLowerCase() === 'no';
-        const sFail = String(row['Pack & Seal Integrity'] || '').toLowerCase() === 'no';
-        const mFail = String(row['Material Uniformity (Mixing)'] || '').toLowerCase() === 'no';
-        const szFail = String(row['Size Uniformity (Slice of Mixes)'] || '').toLowerCase() === 'no';
-
-        const oxyStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
-        const oFail = oxyStatus === 'non-compliant';
-
-        const isGasProd = productRanges[row['Product Name']];
-        const nFail = (isGasProd && String(row['Nitrogen Flush'] || '').toLowerCase() === 'no');
-
-        return lpFail || lkFail || sFail || mFail || szFail || oFail || nFail;
+        const qualityFields = [
+            'Lumps', 'Leakage Test', 'Pack & Seal Integrity', 'Material Uniformity (Mixing)', 
+            'Size Uniformity (Slice of Mixes)', 'Print Window', 'Burn Marks', 'Wrinkles in Seal',
+            'RM Quality (Freshness/Aroma)', 'Seal Offset - Top', 'Seal Offset - Centre', 'Seal Offset - Bottom',
+            'Moisture Condition', 'Aroma Type', 'Texture', 'Taste Profile 1', 'Taste Profile 2', 'Cooking Status'
+        ];
+        for (let field of qualityFields) if (String(row[field] || '').toLowerCase() === 'no') return true;
+        if (getOxygenStatus(row['Product Name'], row['Oxygen % Check']) === 'non-compliant') return true;
+        if (productRanges[row['Product Name']] && String(row['Nitrogen Flush'] || '').toLowerCase() === 'no') return true;
+        return false;
     }
 
-    function renderTable(data, targetBody, isLoading = false) {
+    function renderTable(data, targetBody) {
         if (!targetBody) return;
-
-        if (isLoading) {
-            targetBody.innerHTML = `<tr><td colspan="11" class="loading">Loading data...</td></tr>`;
-            return;
-        }
-
-        if (data.length === 0) {
-            targetBody.innerHTML = `<tr><td colspan="11" class="loading">No matching records found.</td></tr>`;
-            return;
-        }
-
-        // Build entire table HTML as a single string — eliminates per-row DOM reflows
+        if (data.length === 0) { targetBody.innerHTML = `<tr><td colspan="55" class="loading">No matching records found.</td></tr>`; return; }
         const rows = data.map(row => {
             const oxyStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
-            const dateVal = row['Date'] || row['Timestamp'] || row['date'] || row['timestamp'] || row['id'] || row['ID'];
             const failClass = checkRowFailure(row) ? ' class="row-failure"' : '';
-
+            const renderCell = (val) => {
+                const s = String(val || 'N/A');
+                const highlight = (s === 'No') ? ' class="breach-highlight"' : '';
+                return `<td${highlight}>${s}</td>`;
+            };
             return `<tr${failClass}>
-                <td>${formatDate(dateVal)}</td>
-                <td title="${row['Product Name']}">${row['Product Name']}</td>
-                <td class="${String(row['Lumps'] || '').toLowerCase() === 'yes' ? 'breach-highlight' : ''}">${row['Lumps'] || 'N/A'}</td>
-                <td class="${String(row['Leakage Test'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Leakage Test'] || 'N/A'}</td>
-                <td class="${String(row['Pack & Seal Integrity'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Pack & Seal Integrity'] || 'N/A'}</td>
-                <td class="${String(row['Material Uniformity (Mixing)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Material Uniformity (Mixing)'] || 'N/A'}</td>
-                <td class="${String(row['Size Uniformity (Slice of Mixes)'] || '').toLowerCase() === 'no' ? 'breach-highlight' : ''}">${row['Size Uniformity (Slice of Mixes)'] || 'N/A'}</td>
-                <td>${row['Nitrogen Flush'] || 'N/A'}</td>
-                <td class="${oxyStatus === 'breach' || oxyStatus === 'non-compliant' ? 'breach-highlight' : ''}">${row['Oxygen % Check'] || 'N/A'}${oxyStatus !== 'neutral' ? '%' : ''}</td>
+                <td>${row['ID'] || 'N/A'}</td>
+                <td>${row['Batch Code'] || 'N/A'}</td>
+                <td>${row['Type'] || 'N/A'}</td>
+                <td>${formatDate(row['Date'] || '')}</td>
+                <td>${row['Time'] || 'N/A'}</td>
+                <td>${row['Product Name'] || 'N/A'}</td>
+                <td>${row['MRP'] || 'N/A'}</td>
+                <td>${row['USP'] || 'N/A'}</td>
                 <td>${row['Shift'] || 'N/A'}</td>
-                <td title="${row['Checked By']}">${row['Checked By'] || 'N/A'}</td>
+                <td>${row['Machine'] || 'N/A'}</td>
+                <td>${row['Table No'] || 'N/A'}</td>
+                <td>${row['Net Weight'] || 'N/A'}</td>
+                <td>${row['Use By Date'] || 'N/A'}</td>
+                <td>${row['Serving Per Pack'] || 'N/A'}</td>
+                <td>${row['Production Tables'] || 'N/A'}</td>
+                <td>${row['Manufacturing Date'] || 'N/A'}</td>
+                <td>${row['Remarks'] || 'N/A'}</td>
+                <td>${row['MOD'] || 'N/A'}</td>
+                <td>${row['Checked By'] || 'N/A'}</td>
+                <td>${row['Verified By'] || 'N/A'}</td>
+                <td>${row['Average Weight'] || 'N/A'}</td>
+                <td>${row['Empty Pouch Weight'] || 'N/A'}</td>
+                <td>${row['Weights'] || 'N/A'}</td>
+                <td>${row['Nitrogen Flush'] || 'N/A'}</td>
+                ${renderCell(row['Leakage Test'])}
+                <td>${row['Mono Carton'] || 'N/A'}</td>
+                ${renderCell(row['Material Uniformity (Mixing)'])}
+                ${renderCell(row['Pack & Seal Integrity'])}
+                ${renderCell(row['Size Uniformity (Slice of Mixes)'])}
+                ${renderCell(row['Print Window'])}
+                ${renderCell(row['Lumps'])}
+                <td>${row['EAN Scan Check'] || 'N/A'}</td>
+                <td>${row['Damaged/Broken'] || 'N/A'}</td>
+                <td>${row['Carton Label & Size'] || 'N/A'}</td>
+                ${renderCell(row['Burn Marks'])}
+                ${renderCell(row['Wrinkles in Seal'])}
+                ${renderCell(row['RM Quality (Freshness/Aroma)'])}
+                ${renderCell(row['Seal Offset - Top'])}
+                ${renderCell(row['Seal Offset - Centre'])}
+                ${renderCell(row['Seal Offset - Bottom'])}
+                <td>${row['RTV Use & Mixing Qty/Ratio'] || 'N/A'}</td>
+                <td>${row['Mixing Ratio'] || 'N/A'}</td>
+                <td>${row['RTV Remarks'] || 'N/A'}</td>
+                <td class="${oxyStatus === 'non-compliant' ? 'breach-highlight' : ''}">${row['Oxygen % Check'] || 'N/A'}${row['Oxygen % Check'] && row['Oxygen % Check'] !== 'N/A' ? '%' : ''}</td>
+                <td>${row['Pouch Height(mm)'] || 'N/A'}</td>
+                <td>${row['Carton Weight'] || 'N/A'}</td>
+                ${renderCell(row['Crunch/Sogginess'])}
+                <td>${row['Empty Carton Weight'] || 'N/A'}</td>
+                <td>${row['RM Quality Remarks'] || 'N/A'}</td>
+                ${renderCell(row['Moisture Condition'])}
+                <td>${row['Aroma Type'] || 'N/A'}</td>
+                <td>${row['Texture'] || 'N/A'}</td>
+                <td>${row['Taste Profile 1'] || 'N/A'}</td>
+                <td>${row['Taste Profile 2'] || 'N/A'}</td>
+                <td>${row['Cooking Status'] || 'N/A'}</td>
             </tr>`;
         });
-
-        // Single DOM write — much faster than appending row-by-row
         targetBody.innerHTML = rows.join('');
     }
+
+    function exportToExcel() {
+        if (filteredData.length === 0) { alert('No data to export'); return; }
+        const headers = [
+            'ID', 'Batch Code', 'Type', 'Date', 'Time', 'Product Name', 'MRP', 'USP', 'Shift', 'Machine', 'Table No', 'Net Weight', 'Use By Date', 'Serving Per Pack', 'Production Tables', 'Manufacturing Date', 'Remarks', 'MOD', 'Checked By', 'Verified By', 'Average Weight', 'Empty Pouch Weight', 'Weights', 'Nitrogen Flush', 'Leakage Test', 'Mono Carton', 'Material Uniformity (Mixing)', 'Pack & Seal Integrity', 'Size Uniformity (Slice of Mixes)', 'Print Window', 'Lumps', 'EAN Scan Check', 'Damaged/Broken', 'Carton Label & Size', 'Burn Marks', 'Wrinkles in Seal', 'RM Quality (Freshness/Aroma)', 'Seal Offset - Top', 'Seal Offset - Centre', 'Seal Offset - Bottom', 'RTV Use & Mixing Qty/Ratio', 'Mixing Ratio', 'RTV Remarks', 'Oxygen % Check', 'Pouch Height(mm)', 'Carton Weight', 'Crunch/Sogginess', 'Empty Carton Weight', 'RM Quality Remarks', 'Moisture Condition', 'Aroma Type', 'Texture', 'Taste Profile 1', 'Taste Profile 2', 'Cooking Status'
+        ];
+        let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+        filteredData.forEach(row => {
+            const rowData = headers.map(header => {
+                let cell = row[header] || 'N/A';
+                if (typeof cell === 'string' && cell.includes(',')) cell = `"${cell}"`;
+                return cell;
+            });
+            csvContent += rowData.join(",") + "\n";
+        });
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `IPQC_Indore_Export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
     function populateProductFilter(data) {
         if (!productFilter) return;
-        const currentVal = productFilter.value;
         const products = [...new Set(data.map(r => r['Product Name']))].sort();
-        // Build with DocumentFragment for a single DOM write
         const frag = document.createDocumentFragment();
-        const allOpt = document.createElement('option');
-        allOpt.value = 'all'; allOpt.textContent = 'All Products';
-        frag.appendChild(allOpt);
-        products.forEach(p => {
-            const opt = document.createElement('option');
-            opt.value = p;
-            opt.textContent = p;
-            if (p === currentVal) opt.selected = true;
-            frag.appendChild(opt);
-        });
-        productFilter.innerHTML = '';
-        productFilter.appendChild(frag);
+        const allOpt = document.createElement('option'); allOpt.value = 'all'; allOpt.textContent = 'All Products'; frag.appendChild(allOpt);
+        products.forEach(p => { const opt = document.createElement('option'); opt.value = p; opt.textContent = p; frag.appendChild(opt); });
+        productFilter.innerHTML = ''; productFilter.appendChild(frag);
     }
 
     function formatDate(dateStr) {
         if (!dateStr) return 'N/A';
         let date = new Date(dateStr);
-
         if (typeof dateStr === 'string') {
             const INformat = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
-            if (INformat) {
-                date = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
-            }
+            if (INformat) date = new Date(parseInt(INformat[3], 10), parseInt(INformat[2], 10) - 1, parseInt(INformat[1], 10));
         }
-
         if (isNaN(date.getTime())) return dateStr;
-
-        // Return DD/MM/YYYY or similar human readable format
-        return date.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-        });
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
     }
 });
