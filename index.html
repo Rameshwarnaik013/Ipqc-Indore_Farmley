@@ -99,6 +99,9 @@
                         </svg>
                     </button>
                     <button id="syncData" class="btn btn-outline">Sync with GSheet</button>
+                    <button id="downloadExcel" class="btn btn-secondary">
+                        <i class="fas fa-file-excel"></i> Download Excel
+                    </button>
                 </div>
             </header>
 
@@ -159,22 +162,66 @@
                         <table>
                             <thead>
                                 <tr>
+                                    <th>ID</th>
+                                    <th>Batch Code</th>
+                                    <th>Type</th>
                                     <th>Date</th>
+                                    <th>Time</th>
                                     <th>Product Name</th>
-                                    <th>Lumps</th>
-                                    <th>Leakage</th>
-                                    <th>Pack & Seal</th>
-                                    <th>Material Uniformity (Mixing)</th>
-                                    <th>Size Uniformity (Slice of Mixes)</th>
-                                    <th>Nitrogen</th>
-                                    <th>Oxygen %</th>
+                                    <th>MRP</th>
+                                    <th>USP</th>
                                     <th>Shift</th>
+                                    <th>Machine</th>
+                                    <th>Table No</th>
+                                    <th>Net Weight</th>
+                                    <th>Use By Date</th>
+                                    <th>Serving Per Pack</th>
+                                    <th>Production Tables</th>
+                                    <th>Manufacturing Date</th>
+                                    <th>Remarks</th>
+                                    <th>MOD</th>
                                     <th>Checked By</th>
+                                    <th>Verified By</th>
+                                    <th>Avg Wt</th>
+                                    <th>Empty Pouch</th>
+                                    <th>Weights</th>
+                                    <th>Nitrogen</th>
+                                    <th>Leakage</th>
+                                    <th>Mono Carton</th>
+                                    <th>Material Uniformity</th>
+                                    <th>Pack & Seal</th>
+                                    <th>Size Uniformity</th>
+                                    <th>Print Window</th>
+                                    <th>Lumps</th>
+                                    <th>EAN Scan</th>
+                                    <th>Damaged</th>
+                                    <th>Ctn Label</th>
+                                    <th>Burn Marks</th>
+                                    <th>Wrinkles</th>
+                                    <th>RM Freshness</th>
+                                    <th>Offset Top</th>
+                                    <th>Offset Centre</th>
+                                    <th>Offset Bottom</th>
+                                    <th>RTV Use</th>
+                                    <th>Mixing Ratio</th>
+                                    <th>RTV Remarks</th>
+                                    <th>Oxygen %</th>
+                                    <th>Pouch Ht</th>
+                                    <th>Ctn Wt</th>
+                                    <th>Crunch</th>
+                                    <th>Empty Ctn</th>
+                                    <th>RM RMks</th>
+                                    <th>Moisture</th>
+                                    <th>Aroma</th>
+                                    <th>Texture</th>
+                                    <th>Taste 1</th>
+                                    <th>Taste 2</th>
+                                    <th>Cooking</th>
                                 </tr>
                             </thead>
                             <tbody id="dashboardTableBody">
                                 <tr>
-                                    <td colspan="11" class="loading">Loading dashboard data...</td>
+                                    <td colspan="55" class="loading">Loading dashboard data...</td>
                                 </tr>
                             </tbody>
                         </table>
