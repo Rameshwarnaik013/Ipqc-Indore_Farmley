@@ -541,7 +541,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function renderTable(data, targetBody) {
         if (!targetBody) return;
-        if (data.length === 0) { targetBody.innerHTML = `<tr><td colspan="55" class="loading">No matching records found.</td></tr>`; return; }
+        if (data.length === 0) { targetBody.innerHTML = `<tr><td colspan="27" class="loading">No matching records found.</td></tr>`; return; }
         const rows = data.map(row => {
             const oxyStatus = getOxygenStatus(row['Product Name'], row['Oxygen % Check']);
             const failClass = checkRowFailure(row) ? ' class="row-failure"' : '';
@@ -551,40 +551,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 return `<td${highlight}>${s}</td>`;
             };
             return `<tr${failClass}>
-                <td>${row['ID'] || 'N/A'}</td>
                 <td>${row['Batch Code'] || 'N/A'}</td>
-                <td>${row['Type'] || 'N/A'}</td>
-                <td>${formatDate(row['Date'] || '')}</td>
-                <td>${row['Time'] || 'N/A'}</td>
                 <td>${row['Product Name'] || 'N/A'}</td>
-                <td>${row['MRP'] || 'N/A'}</td>
-                <td>${row['USP'] || 'N/A'}</td>
-                <td>${row['Shift'] || 'N/A'}</td>
-                <td>${row['Machine'] || 'N/A'}</td>
-                <td>${row['Table No'] || 'N/A'}</td>
-                <td>${row['Net Weight'] || 'N/A'}</td>
-                <td>${row['Use By Date'] || 'N/A'}</td>
-                <td>${row['Serving Per Pack'] || 'N/A'}</td>
-                <td>${row['Production Tables'] || 'N/A'}</td>
-                <td>${row['Manufacturing Date'] || 'N/A'}</td>
-                <td>${row['Remarks'] || 'N/A'}</td>
-                <td>${row['MOD'] || 'N/A'}</td>
-                <td>${row['Checked By'] || 'N/A'}</td>
-                <td>${row['Verified By'] || 'N/A'}</td>
-                <td>${row['Average Weight'] || 'N/A'}</td>
-                <td>${row['Empty Pouch Weight'] || 'N/A'}</td>
-                <td>${row['Weights'] || 'N/A'}</td>
                 <td>${row['Nitrogen Flush'] || 'N/A'}</td>
                 ${renderCell(row['Leakage Test'])}
-                <td>${row['Mono Carton'] || 'N/A'}</td>
                 ${renderCell(row['Material Uniformity (Mixing)'])}
                 ${renderCell(row['Pack & Seal Integrity'])}
                 ${renderCell(row['Size Uniformity (Slice of Mixes)'])}
-                ${renderCell(row['Print Window'])}
                 ${renderCell(row['Lumps'])}
-                <td>${row['EAN Scan Check'] || 'N/A'}</td>
-                <td>${row['Damaged/Broken'] || 'N/A'}</td>
-                <td>${row['Carton Label & Size'] || 'N/A'}</td>
                 ${renderCell(row['Burn Marks'])}
                 ${renderCell(row['Wrinkles in Seal'])}
                 ${renderCell(row['RM Quality (Freshness/Aroma)'])}
@@ -604,8 +578,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${row['Aroma Type'] || 'N/A'}</td>
                 <td>${row['Texture'] || 'N/A'}</td>
                 <td>${row['Taste Profile 1'] || 'N/A'}</td>
-                <td>${row['Taste Profile 2'] || 'N/A'}</td>
-                <td>${row['Cooking Status'] || 'N/A'}</td>
             </tr>`;
         });
         targetBody.innerHTML = rows.join('');
@@ -613,14 +585,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function exportToExcel() {
         if (filteredData.length === 0) { alert('No data to export'); return; }
-        const headers = [
-            'ID', 'Batch Code', 'Type', 'Date', 'Time', 'Product Name', 'MRP', 'USP', 'Shift', 'Machine', 'Table No', 'Net Weight', 'Use By Date', 'Serving Per Pack', 'Production Tables', 'Manufacturing Date', 'Remarks', 'MOD', 'Checked By', 'Verified By', 'Average Weight', 'Empty Pouch Weight', 'Weights', 'Nitrogen Flush', 'Leakage Test', 'Mono Carton', 'Material Uniformity (Mixing)', 'Pack & Seal Integrity', 'Size Uniformity (Slice of Mixes)', 'Print Window', 'Lumps', 'EAN Scan Check', 'Damaged/Broken', 'Carton Label & Size', 'Burn Marks', 'Wrinkles in Seal', 'RM Quality (Freshness/Aroma)', 'Seal Offset - Top', 'Seal Offset - Centre', 'Seal Offset - Bottom', 'RTV Use & Mixing Qty/Ratio', 'Mixing Ratio', 'RTV Remarks', 'Oxygen % Check', 'Pouch Height(mm)', 'Carton Weight', 'Crunch/Sogginess', 'Empty Carton Weight', 'RM Quality Remarks', 'Moisture Condition', 'Aroma Type', 'Texture', 'Taste Profile 1', 'Taste Profile 2', 'Cooking Status'
+        const exportColumns = [
+            { header: 'Batch Code', key: 'Batch Code' },
+            { header: 'Product Name', key: 'Product Name' },
+            { header: 'Nitrogen', key: 'Nitrogen Flush' },
+            { header: 'Leakage', key: 'Leakage Test' },
+            { header: 'Material Uniformity', key: 'Material Uniformity (Mixing)' },
+            { header: 'Pack & Seal', key: 'Pack & Seal Integrity' },
+            { header: 'Size Uniformity', key: 'Size Uniformity (Slice of Mixes)' },
+            { header: 'Lumps', key: 'Lumps' },
+            { header: 'Burn Marks', key: 'Burn Marks' },
+            { header: 'Wrinkles', key: 'Wrinkles in Seal' },
+            { header: 'RM Freshness', key: 'RM Quality (Freshness/Aroma)' },
+            { header: 'Offset Top', key: 'Seal Offset - Top' },
+            { header: 'Offset Centre', key: 'Seal Offset - Centre' },
+            { header: 'Offset Bottom', key: 'Seal Offset - Bottom' },
+            { header: 'RTV Use', key: 'RTV Use & Mixing Qty/Ratio' },
+            { header: 'Mixing Ratio', key: 'Mixing Ratio' },
+            { header: 'RTV Remarks', key: 'RTV Remarks' },
+            { header: 'Oxygen %', key: 'Oxygen % Check' },
+            { header: 'Pouch Ht', key: 'Pouch Height(mm)' },
+            { header: 'Ctn Wt', key: 'Carton Weight' },
+            { header: 'Crunch', key: 'Crunch/Sogginess' },
+            { header: 'Empty Ctn', key: 'Empty Carton Weight' },
+            { header: 'RM RMks', key: 'RM Quality Remarks' },
+            { header: 'Moisture', key: 'Moisture Condition' },
+            { header: 'Aroma', key: 'Aroma Type' },
+            { header: 'Texture', key: 'Texture' },
+            { header: 'Taste 1', key: 'Taste Profile 1' }
         ];
+        const headers = exportColumns.map(c => c.header);
         let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
         filteredData.forEach(row => {
-            const rowData = headers.map(header => {
-                let cell = row[header] || 'N/A';
-                if (typeof cell === 'string' && cell.includes(',')) cell = `"${cell}"`;
+            const rowData = exportColumns.map(col => {
+                let cell = row[col.key] || 'N/A';
+                if (typeof cell === 'string' && (cell.includes(',') || cell.includes('"') || cell.includes('\n'))) {
+                    cell = `"${cell.replace(/"/g, '""')}"`;
+                }
                 return cell;
             });
             csvContent += rowData.join(",") + "\n";
@@ -628,7 +629,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `IPQC_Indore_Export_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `IPQC_Indore_Quality_Report_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

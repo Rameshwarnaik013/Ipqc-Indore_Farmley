@@ -375,9 +375,9 @@ td {
 }
 
 /* Base column widths for better alignment */
-tr th:nth-child(1), tr td:nth-child(1) { width: 100px; } /* Date */
-tr th:nth-child(2), tr td:nth-child(2) { width: 250px; white-space: normal; } /* Product Name */
-tr th:nth-child(3), tr td:nth-child(3) { width: 100px; text-align: center; } /* Machine */
+tr th:nth-child(1), tr td:nth-child(1) { width: 140px; } /* Batch Code */
+tr th:nth-child(2), tr td:nth-child(2) { width: 280px; white-space: normal; } /* Product Name */
+tr th:nth-child(3), tr td:nth-child(3) { width: 100px; text-align: center; } /* Nitrogen */
 
 /* Staff */
 
