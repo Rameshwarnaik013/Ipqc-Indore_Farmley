@@ -330,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         } catch (error) {
             console.error('Fetch error:', error);
-            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Sync failed — showing last cached data';
+            if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
             if (allData.length === 0) {
                 allData = normalizeData(mockData || []);
                 allData.forEach(parseRowDate);
