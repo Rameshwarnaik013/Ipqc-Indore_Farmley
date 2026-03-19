@@ -225,13 +225,13 @@ tr.row-failure td {
 /* Stats Overview */
 .stats-overview {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
 }
 
 .stat-card {
     background-color: var(--bg-card);
-    padding: 1.25rem;
+    padding: 1rem;
     border-radius: 1rem;
     box-shadow: var(--shadow);
     border: 1px solid var(--border);
@@ -256,12 +256,19 @@ tr.row-failure td {
 }
 
 .stat-title {
-    font-size: 0.8rem;
-    font-weight: 600;
+    font-size: 0.75rem;
+    font-weight: 700;
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
     text-transform: uppercase;
     letter-spacing: 0.025em;
+    line-height: 1.2;
+    min-height: 1.8rem;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .stat-value {

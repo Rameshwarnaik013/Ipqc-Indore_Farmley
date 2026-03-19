@@ -413,6 +413,9 @@ document.addEventListener('DOMContentLoaded', () => {
             ['totalRecords', 'lumpsCompliance', 'leakageCompliance', 'sealCompliance', 'materialCompliance', 'sizeCompliance', 'oxygenCompliance'].forEach(id => {
                const el = document.getElementById(id); if (el) el.textContent = '0%';
             });
+            ['lumpsCount', 'leakageCount', 'sealCount', 'materialCount', 'sizeCount', 'oxygenCount'].forEach(id => {
+               const el = document.getElementById(id); if (el) el.textContent = '0 / 0 compliant';
+            });
             totalRecordsEl.textContent = '0';
             return;
         }
@@ -439,12 +442,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const seal = calcComp('Pack & Seal Integrity', 'Yes');
         const material = calcMaterial();
         const size = calcComp('Size Uniformity (Slice of Mixes)', 'Yes');
+        
         const oxygenChecked = data.filter(r => !isNaN(parseFloat(r['Oxygen % Check'])));
         const compliantOxygen = oxygenChecked.filter(r => getOxygenStatus(r['Product Name'], r['Oxygen % Check']) === 'compliant').length;
         const oxygenPercent = oxygenChecked.length > 0 ? ((compliantOxygen / oxygenChecked.length) * 100).toFixed(1) : 'N/A';
+        const oxygenStats = { percent: oxygenPercent, count: compliantOxygen, total: oxygenChecked.length };
+
         totalRecordsEl.textContent = total;
+        
         const setVal = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val === 'N/A' ? 'N/A' : `${val}%`; };
-        setVal('lumpsCompliance', lumps.percent); setVal('leakageCompliance', leakage.percent); setVal('sealCompliance', seal.percent); setVal('materialCompliance', material.percent); setVal('sizeCompliance', size.percent); setVal('oxygenCompliance', oxygenPercent);
+        const setCount = (id, stats) => { 
+            const el = document.getElementById(id); 
+            if (el) el.textContent = stats.percent === 'N/A' ? '0 / 0 compliant' : `${stats.count} / ${stats.total} compliant`; 
+        };
+
+        setVal('lumpsCompliance', lumps.percent); setCount('lumpsCount', lumps);
+        setVal('leakageCompliance', leakage.percent); setCount('leakageCount', leakage);
+        setVal('sealCompliance', seal.percent); setCount('sealCount', seal);
+        setVal('materialCompliance', material.percent); setCount('materialCount', material);
+        setVal('sizeCompliance', size.percent); setCount('sizeCount', size);
+        setVal('oxygenCompliance', oxygenStats.percent); setCount('oxygenCount', oxygenStats);
     }
 
     function renderCharts(data) {
