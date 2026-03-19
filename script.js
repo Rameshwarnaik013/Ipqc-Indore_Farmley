@@ -237,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     populateShiftFilter(allData);
                     filteredData = filterData(allData);
                     processAndRender(filteredData);
-                    if (lastUpdatedEl) lastUpdatedEl.textContent = 'Showing cached data — syncing live...';
+
                 }
             } catch (e) { console.warn("Cache parse failed", e); }
         }
@@ -296,7 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function fetchData() {
         try {
             if (refreshIcon) refreshIcon.classList.add('rotating');
-            if (lastUpdatedEl && allData.length > 0) lastUpdatedEl.textContent = 'Syncing latest data...';
+
 
             // --- Tiered Fetching Strategy ---
             // Stage 1: Fast fetch for Today & Yesterday
@@ -308,14 +308,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const startDateParam = formatDateParam(yesterday);
             const endDateParam = formatDateParam(now);
 
-            if (lastUpdatedEl) lastUpdatedEl.textContent = 'Fetching Today/Yesterday...';
+
             
             // Short timeout for Stage 1 (15s)
             const partialData = await fetchWithTimeout(`${APPS_SCRIPT_URL}?startDate=${startDateParam}&endDate=${endDateParam}&t=${Date.now()}`, 15000);
             
             if (partialData && partialData.length > 0) {
                 updateAllData(partialData);
-                if (lastUpdatedEl) lastUpdatedEl.textContent = 'Recent data loaded. Fetching history...';
+
             }
 
             // Stage 2: Background fetch for full history (last 30 days)
@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (fullData && fullData.length > 0) {
                 localStorage.setItem('farmley_ipqc_data', JSON.stringify(fullData));
                 updateAllData(fullData);
-                if (lastUpdatedEl) lastUpdatedEl.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+
             }
 
         } catch (error) {
