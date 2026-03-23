@@ -266,11 +266,6 @@ tr.row-failure td {
   letter-spacing: 0.025em;
   line-height: 1.2;
   min-height: 1.8rem;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .stat-value {

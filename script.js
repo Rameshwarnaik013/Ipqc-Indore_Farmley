@@ -584,6 +584,20 @@ document.addEventListener("DOMContentLoaded", () => {
     const setVal = (id, val) => {
       const el = document.getElementById(id);
       if (el) el.textContent = val === "N/A" ? "N/A" : `${val}%`;
+      const card = el?.closest(".stat-card");
+      if (card && val !== "N/A") {
+        card.classList.remove(
+          "high-compliance",
+          "mid-compliance",
+          "low-compliance",
+        );
+        const num = parseFloat(val);
+        if (!isNaN(num)) {
+          if (num === 100) card.classList.add("high-compliance");
+          else if (num >= 80) card.classList.add("mid-compliance");
+          else card.classList.add("low-compliance");
+        }
+      }
     };
     const setCount = (id, stats) => {
       const el = document.getElementById(id);
