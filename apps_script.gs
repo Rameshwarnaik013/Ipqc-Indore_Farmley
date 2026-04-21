@@ -8,13 +8,17 @@ function doGet(e) {
     return createErrorResponse("Spreadsheet Access Error", error.toString());
   }
 
-  var sheet = ss.getSheetByName(sheetName) || ss.getSheets()[0];
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    // If 'sheet1' doesn't exist, try common variations or fallback to first sheet
+    sheet = ss.getSheetByName('Sheet1') || ss.getSheets()[0];
+  }
+  
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return ContentService.createTextOutput("[]").setMimeType(ContentService.MimeType.JSON);
 
-  // Optimization: Fetch only the last 2000 rows to ensure fast response.
-  // 2000 rows should easily cover Today & Yesterday plus several weeks.
-  var MAX_FETCH = 2000; 
+  // Increased limit to 5000 rows for better historical visibility
+  var MAX_FETCH = 5000; 
   var startRow = Math.max(2, lastRow - MAX_FETCH + 1);
   var numRows = lastRow - startRow + 1;
   
@@ -22,8 +26,8 @@ function doGet(e) {
   var data = sheet.getRange(startRow, 1, numRows, sheet.getLastColumn()).getValues();
 
   var params = e && e.parameter ? e.parameter : {};
-  var startDate = params.startDate ? new Date(params.startDate) : null;
-  var endDate = params.endDate ? new Date(params.endDate) : null;
+  var startDate = params.startDate ? parseDateParam(params.startDate) : null;
+  var endDate = params.endDate ? parseDateParam(params.endDate) : null;
   
   // Identify Date column index
   var dateIdx = -1;
@@ -37,7 +41,13 @@ function doGet(e) {
   for (var i = data.length - 1; i >= 0; i--) {
     var row = data[i];
     var rowDateValue = dateIdx >= 0 ? row[dateIdx] : null;
-    var rowDate = (rowDateValue instanceof Date) ? rowDateValue : (rowDateValue ? new Date(rowDateValue) : null);
+    var rowDate = null;
+    
+    if (rowDateValue instanceof Date) {
+      rowDate = rowDateValue;
+    } else if (rowDateValue) {
+      rowDate = new Date(rowDateValue);
+    }
 
     // Apply date filtering if parameters provided
     if (startDate && rowDate && rowDate < startDate) continue;
@@ -54,13 +64,23 @@ function doGet(e) {
     }
     result.push(obj);
     
-    // Safety break
-    if (result.length >= 1000) break;
+    // Removed the 1000 limit to allow for larger data sets to be filtered on frontend
+    // Safety break at 5000 (same as fetch)
+    if (result.length >= MAX_FETCH) break;
   }
 
   return ContentService.createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
+function parseDateParam(str) {
+  if (!str) return null;
+  var d = new Date(str);
+  if (isNaN(d.getTime())) return null;
+  // Normalize to start of day for comparison
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
 
 function createErrorResponse(msg, details) {
   return ContentService.createTextOutput(JSON.stringify({ error: msg, details: details }))

@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Configuration ---
   const APPS_SCRIPT_URL =
-    "https://script.google.com/macros/s/AKfycbzNVAaFAR1aMuJlk9vUWljryMv9HgRvGendH_mmqweCYp6dV0q48l-49_myQRudgwBo/exec";
+    "https://script.google.com/macros/s/AKfycbxE06RQvh__358GOx-_XKMI8op0AdXaiIS5NrOSzG8aT66xlqz6N8DB1Z--1dAynJyJ/exec";
 
   // --- Product Oxygen % Target Ranges ---
   const productRanges = {
@@ -440,6 +440,34 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  /**
+   * Fallback: If no data matches current filters (usually "Today"),
+   * find the most recent date available in the dataset and show it.
+   */
+  function showLatestAvailableDate(data) {
+    if (!data || data.length === 0) return [];
+    
+    // Find the max date
+    const maxDate = new Date(Math.max(...data.map(d => d._parsedDate ? d._parsedDate.getTime() : 0)));
+    if (!maxDate || isNaN(maxDate.getTime()) || maxDate.getTime() === 0) return data;
+
+    const dateStr = maxDate.getFullYear() + '-' + 
+                    String(maxDate.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(maxDate.getDate()).padStart(2, '0');
+    
+    if (startDateInput) startDateInput.value = dateStr;
+    if (endDateInput) endDateInput.value = dateStr;
+    if (datePreset) datePreset.value = "custom";
+    
+    if (lastUpdatedEl) {
+      const formattedDate = maxDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      lastUpdatedEl.innerHTML = `<span style="color: #ef4444; font-weight: 600;">Showing latest available data from ${formattedDate}</span>`;
+    }
+
+    return filterData(data);
+  }
+
+
   function processAndRender(data) {
     const sorted = [...data].sort(
       (a, b) =>
@@ -556,7 +584,7 @@ document.addEventListener("DOMContentLoaded", () => {
         total: relevant.length,
       };
     };
-    const lumps = calcComp("Lumps", "No");
+    const lumps = calcComp("Lumps", "Yes");
     const leakage = calcComp("Leakage Test", "Yes");
     const seal = calcComp("Pack & Seal Integrity", "Yes");
     const material = calcMaterial();
@@ -644,7 +672,7 @@ document.addEventListener("DOMContentLoaded", () => {
       ).length;
       return { pass, fail: rel.length - pass };
     };
-    const l = getStatsBreakdown("Lumps", "No");
+    const l = getStatsBreakdown("Lumps", "Yes");
     passData.push(l.pass);
     failData.push(l.fail);
     const lk = getStatsBreakdown("Leakage Test", "Yes");
